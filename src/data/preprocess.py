@@ -22,23 +22,23 @@ def _splitTextToSentences(text):
 
     Parameters
     ----------
-    document : str
-        Source document to summarize.
+        document : str
+            Source document to summarize.
 
-    summary : str
-        Summary of the document.
+        summary : str
+            Summary of the document.
 
-    extractive_size : int
-        Number of sentences to include in the summary.
+        extractive_size : int
+            Number of sentences to include in the summary.
 
     Returns
     ----------
-    doc_sentences : str[]
-        Sentences of the document.
+        doc_sentences : str[]
+            Sentences of the document.
 
-    labels : bool[]         
-        Label for each sentence of the document.
-        (True if the sentence is part of the summary, False otherwise).
+        labels : bool[]         
+            Label for each sentence of the document.
+            (True if the sentence is part of the summary, False otherwise).
 """
 def abstractiveToExtractive(document: str, summary: str, extractive_size=3):
     doc_sentences = _splitTextToSentences(document)
@@ -114,23 +114,20 @@ def _getDatasetAndUtilities(name, dataset_dir):
 
     Parameters
     ----------
-    sentences : str[]
-    labels : bool[]
-    tokenizer : BertTokenizer
-    max_tokens : int
+        sentences : str[]
+        labels : bool[]
+        tokenizer : BertTokenizer
+        max_tokens : int
 
     Returns
     -------
         doc_ids : str[]
             Tokenized document
-        
-        summ_labels : int[]
-            Flag for each sentence (1 if part of the summary, 0 if not)
 
         segments_ids : int[]
             Position of each sentence (alternating 0s and 1s to distinguish sentences)
 
-        cls_ids : int[]
+        cls_idxs : int[]
             Position of [CLS] tokens
 """
 def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
@@ -150,12 +147,10 @@ def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     segments_ids = segments_ids
     
     # Position of [CLS] tokens
-    cls_ids = [i for i, token in enumerate(doc_ids) if token == tokenizer.vocab["[CLS]"]]
+    cls_idxs = [i for i, token in enumerate(doc_ids) if token == tokenizer.vocab["[CLS]"]]
 
-    # Label for each sentence (1 if included in the summary, 0 otherwise)
-    summ_labels = [ 1 if label else 0 for label in labels[:len(cls_ids)] ]
+    return doc_ids, segments_ids, cls_idxs
 
-    return doc_ids, summ_labels, segments_ids, cls_ids
 
 
 if __name__ == "__main__":
@@ -184,11 +179,10 @@ if __name__ == "__main__":
         out["__summary"] = summary  # Reference abstractive summary
 
         if args.model == "bert":
-            doc_ids, summ_labels, segments_ids, cls_ids = parseForBERT(sents, labels, tokenizer)
+            doc_ids, segments_ids, cls_idxs = parseForBERT(sents, labels, tokenizer)
             out["__bert_doc_ids"] = doc_ids
-            out["__bert_summ_labels"] = summ_labels
             out["__bert_segments_ids"] = segments_ids
-            out["__bert_cls_ids"] = cls_ids
+            out["__bert_cls_idxs"] = cls_idxs
 
         return out
     dataset = dataset.map(parseDataset, num_proc=args.proc)
@@ -204,9 +198,8 @@ if __name__ == "__main__":
 
         if args.model == "bert":
             dataset_content["bert_doc_ids"] = dataset[split_name]["__bert_doc_ids"]
-            dataset_content["bert_summ_labels"] = dataset[split_name]["__bert_summ_labels"]
             dataset_content["bert_segments_ids"] = dataset[split_name]["__bert_segments_ids"]
-            dataset_content["bert_cls_ids"] = dataset[split_name]["__bert_cls_ids"]
+            dataset_content["bert_cls_idxs"] = dataset[split_name]["__bert_cls_idxs"]
 
         parsed_dataset[split_name] = Dataset.from_dict(dataset_content, split=split_name)
     parsed_dataset = DatasetDict(parsed_dataset)
