@@ -220,7 +220,7 @@ if __name__ == "__main__":
     if args.model == "bert": tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
             
     # Dataset parsing
-    def parseDataset(data):
+    def _parseDataset(data):
         out = {}
         document, summary = dataExtractor(data)
         sents, labels = abstractiveToExtractive(document, summary, extractive_size=args.selection_size)
@@ -236,23 +236,29 @@ if __name__ == "__main__":
             out["__labels"] = labels
 
         return out
-    dataset = dataset.map(parseDataset, num_proc=args.proc)
+    dataset = dataset.map(_parseDataset, num_proc=args.proc)
 
-    # Recreate original split structure
-    parsed_dataset = {}
-    for split_name in dataset:
+
+    # Splitting
+    def _filterDataset(dataset):
         dataset_content = {
-            "full_sentences": dataset[split_name]["__full_sentences"],    
-            "ref_summary": dataset[split_name]["__summary"],    
-            "labels": dataset[split_name]["__labels"]           
+            "full_sentences": dataset["__full_sentences"],    
+            "ref_summary": dataset["__summary"],    
+            "labels": dataset["__labels"]           
         }
 
         if args.model == "bert":
-            dataset_content["bert_doc_ids"] = dataset[split_name]["__bert_doc_ids"]
-            dataset_content["bert_segments_ids"] = dataset[split_name]["__bert_segments_ids"]
-            dataset_content["bert_cls_idxs"] = dataset[split_name]["__bert_cls_idxs"]
+            dataset_content["bert_doc_ids"] = dataset["__bert_doc_ids"]
+            dataset_content["bert_segments_ids"] = dataset["__bert_segments_ids"]
+            dataset_content["bert_cls_idxs"] = dataset["__bert_cls_idxs"]
 
-        parsed_dataset[split_name] = Dataset.from_dict(dataset_content, split=split_name)
+        return Dataset.from_dict(dataset_content)
+    
+    parsed_dataset = {}
+    if args.dataset in ["cnn_dailymail", "ms2"]:
+        parsed_dataset["train"] = _filterDataset(dataset["train"])
+        parsed_dataset["test"] = _filterDataset(dataset["test"])
+        parsed_dataset["validation"] = _filterDataset(dataset["validation"])
     parsed_dataset = DatasetDict(parsed_dataset)
 
 
