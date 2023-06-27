@@ -10,12 +10,8 @@ from transformers import BertTokenizer
 import itertools
 import random
 
-nlp = spacy.load("en_core_web_sm")
+doc2sentences = spacy.load("en_core_web_sm")
 
-
-
-def _splitTextToSentences(text):
-    return [sent.text for sent in nlp(text).sents]
 
 
 """
@@ -33,6 +29,7 @@ def _splitTextToSentences(text):
 
         extractive_size : int
             Number of sentences to include in the summary.
+            The maximum between this value and the number of sentences in the abstractive summary will be considered.
 
     Returns
     ----------
@@ -44,10 +41,12 @@ def _splitTextToSentences(text):
             (True if the sentence is part of the summary, False otherwise).
 """
 def abstractiveToExtractive(document: str, summary: str, extractive_size=3):
-    doc_sentences = _splitTextToSentences(document)
+    doc_sentences = [sent.text for sent in doc2sentences(document).sents]
+    summ_sentences = [sent.text for sent in doc2sentences(summary).sents]
     selected_sentences_idx = [] # Indexes of the sentences considered as part of the summary
     max_rouge = 0.0             # Current best ROUGE score
     scorer = RougeScorer(["rouge1", "rouge2"])
+    extractive_size = max( extractive_size, len(summ_sentences) )
 
     for _ in range(extractive_size):
         curr_selected_i = -1
@@ -58,9 +57,9 @@ def abstractiveToExtractive(document: str, summary: str, extractive_size=3):
             # Evaluates the ROUGE score of the summary that consideres this sentence (order is not relevant)
             tmp_summary = " ".join([doc_sentences[j] for j in selected_sentences_idx] + [sentence])
             rouge_scores = scorer.score(summary, tmp_summary)
-            rouge_with_sentence = rouge_scores["rouge1"].recall + rouge_scores["rouge2"].recall
+            rouge_with_sentence = 0.1*rouge_scores["rouge1"].recall + 0.9*rouge_scores["rouge2"].recall
 
-            if rouge_with_sentence > max_rouge:
+            if rouge_with_sentence > max_rouge+1e-3: # To prevent adding sentences that may be just redundant
                 curr_selected_i = i
                 max_rouge = rouge_with_sentence
 
@@ -69,7 +68,6 @@ def abstractiveToExtractive(document: str, summary: str, extractive_size=3):
 
         selected_sentences_idx.append(curr_selected_i)
 
-    selected_sentences_idx = sorted(selected_sentences_idx)
     labels = [ (i in selected_sentences_idx) for i in range(len(doc_sentences)) ]
 
     return doc_sentences, labels
@@ -136,6 +134,7 @@ def reduceTokens(sentences, labels, max_tokens):
     while total_tokens > max_tokens:
         # Randomly selects a sentence that is not part of the summary
         removable_sentences = [i for i, selected in enumerate(labels) if not selected]
+        if len(removable_sentences) == 0: break
         to_remove_sentence_idx = random.choice(removable_sentences)
         
         total_tokens -= len(sentences[to_remove_sentence_idx])
@@ -178,6 +177,7 @@ def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     tokenized_sentences = [["[CLS]"] + list(y) for x, y in itertools.groupby(doc_tokens, lambda t: t == "[CLS]") if not x]
     reduced_sentences, reduced_labels = reduceTokens(tokenized_sentences, labels, max_tokens)
     doc_tokens = list(itertools.chain.from_iterable(reduced_sentences))
+    if len(doc_tokens) > max_tokens: doc_tokens = doc_tokens[:max_tokens-1] + ["[SEP]"] # In case the document can't be reduced further
 
     # doc_tokens = tokenizer.tokenize( " [SEP] [CLS] ".join(sentences) )
     # doc_tokens = ["[CLS]"] + doc_tokens[:max_tokens-2] + ["[SEP]"]
@@ -208,6 +208,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, help="Directory where the dataset will be exported to")
     parser.add_argument("--proc", type=int, default=1, help="Number of processes to create")
     parser.add_argument("--model", type=str, choices=["bert"], help="Model the dataset targets", required=True)
+    parser.add_argument("--selection-size", type=int, default=3, help="Number of sentences to select")
     args = parser.parse_args()
     
     random.seed(42)
@@ -222,7 +223,7 @@ if __name__ == "__main__":
     def parseDataset(data):
         out = {}
         document, summary = dataExtractor(data)
-        sents, labels = abstractiveToExtractive(document, summary)
+        sents, labels = abstractiveToExtractive(document, summary, extractive_size=args.selection_size)
         out["__full_sentences"] = sents  # Sentences of the document to summarize
         out["__labels"] = labels    # Boolean associated to each sentence of the document
         out["__summary"] = summary  # Reference abstractive summary
