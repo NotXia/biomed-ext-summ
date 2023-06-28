@@ -7,6 +7,7 @@ import numpy as np
 import argparse
 import os
 import random
+from utilities.transformer import NoamScheduler
 
 
 
@@ -70,7 +71,7 @@ def getBERTModelsOutput(model, document_batch):
         checkpoint_best : bool
             If True, a checkpoint will be created each time a model has a better validation accuracy.
 """
-def train(model, getModelOutput, loss, optimizer, train_dataloader, val_dataloader, epochs, device, checkpoints_path, checkpoints_frequency, checkpoint_best, starting_epoch=1):
+def train(model, getModelOutput, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, checkpoints_path, checkpoints_frequency, checkpoint_best, starting_epoch=1):
     def _createCheckpoint(path, epoch_num, model, optimizer, avg_loss, avg_accuracy):
         torch.save({
             "epoch": epoch_num,
@@ -106,6 +107,7 @@ def train(model, getModelOutput, loss, optimizer, train_dataloader, val_dataload
 
             total_train_loss += batch_loss.item()
             total_train_accuracy += accuracy(labels, outputs)
+        scheduler.step()
 
         # Validation
         model.eval()
@@ -164,6 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--model-family", type=str, choices=["bert"], required=True, help="Family of the model")
     parser.add_argument("--dataset", type=str, required=True, help="Path to a dataset parsed with preprocess.py")
     parser.add_argument("--epochs", type=int, required=True, help="Number of epochs to train")
+    parser.add_argument("--warmup", type=int, default=0, help="Number of warm-up steps")
     parser.add_argument("--batch-size", type=int, required=True)
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--beta1", type=float, default=0.9)
@@ -188,6 +191,7 @@ if __name__ == "__main__":
     val_dataloader = torch.utils.data.DataLoader(datasets["validation"], batch_size=args.batch_size)
     loss = torch.nn.BCELoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+    scheduler = NoamScheduler(optimizer, args.warmup, model.scheduler_d_model)
     starting_epoch = 1
 
     if not os.path.exists(args.checkpoints_path):
@@ -199,6 +203,7 @@ if __name__ == "__main__":
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         starting_epoch = checkpoint["epoch"] + 1
+        scheduler.epoch = checkpoint["epoch"]
 
     print("-- Starting training --")
     train(
@@ -206,6 +211,7 @@ if __name__ == "__main__":
         getModelOutput = getBERTModelsOutput,
         loss = loss, 
         optimizer = optimizer, 
+        scheduler = scheduler,
         train_dataloader = train_dataloader, 
         val_dataloader = val_dataloader, 
         epochs = args.epochs,

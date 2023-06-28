@@ -32,6 +32,7 @@ class BERTSummarizer(nn.Module):
         self.input_size = input_size
         self.bert = BertModel.from_pretrained(bert_model)
         self.encoder = TransformerInterEncoder(self.bert.config.hidden_size)
+        self.scheduler_d_model = self.bert.config.hidden_size # For Noam scheduler
 
     def forward(self, document_ids, segments_ids, cls_mask, bert_mask):
         tokens_out, _ = self.bert(input_ids=document_ids, token_type_ids=segments_ids, attention_mask=bert_mask, return_dict=False)

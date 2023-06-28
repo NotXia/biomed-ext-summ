@@ -20,3 +20,21 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
+
+
+"""
+    Same scheduler as in "Attention Is All You Need"
+"""
+class NoamScheduler():
+    def __init__(self, optimizer, warmup, model_size):
+        self.epoch = 0
+        self.optimizer = optimizer
+        self.warmup = warmup
+        self.model_size = model_size
+
+    def step(self):
+        self.epoch += 1
+        new_lr = self.model_size**(-0.5) * min(self.epoch**(-0.5), self.epoch * self.warmup**(-1.5))
+
+        for param in self.optimizer.param_groups:
+            param["lr"] = new_lr
