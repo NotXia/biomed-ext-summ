@@ -39,7 +39,7 @@ def accuracy(labels, predictions):
 """
     Makes a prediction for a BERT-based model
 """
-def getBERTModelsOutput(model, document_batch):
+def getBERTModelsOutput(model, document_batch, device):
     ids = document_batch["ids"].to(device)
     segments_ids = document_batch["segments_ids"].to(device)
     clss_mask = document_batch["clss_mask"].to(device)
@@ -100,7 +100,7 @@ def train(model, getModelOutput, loss, optimizer, scheduler, train_dataloader, v
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            outputs = getModelOutput(model, documents)
+            outputs = getModelOutput(model, documents, device)
             batch_loss = loss(outputs, labels.float())
             batch_loss.backward()
             optimizer.step()
@@ -115,7 +115,7 @@ def train(model, getModelOutput, loss, optimizer, scheduler, train_dataloader, v
             for documents, labels in val_dataloader:
                 labels = labels.to(device)
 
-                outputs = getModelOutput(model, documents)
+                outputs = getModelOutput(model, documents, device)
                 batch_loss = loss(outputs, labels.float())
 
                 total_val_loss += batch_loss.item()
