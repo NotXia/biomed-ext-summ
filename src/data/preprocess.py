@@ -209,6 +209,7 @@ if __name__ == "__main__":
     parser.add_argument("--proc", type=int, default=1, help="Number of processes to create")
     parser.add_argument("--model", type=str, choices=["bert"], help="Model the dataset targets", required=True)
     parser.add_argument("--selection-size", type=int, default=3, help="Number of sentences to select")
+    parser.add_argument("--tokenizer", type=str, default="bert-base-uncased", help="Tokenizer to use")
     args = parser.parse_args()
     
     random.seed(42)
@@ -217,7 +218,7 @@ if __name__ == "__main__":
 
 
     tokenizer = None
-    if args.model == "bert": tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+    if args.model == "bert": tokenizer = BertTokenizer.from_pretrained(args.tokenizer, do_lower_case=True)
             
     # Dataset parsing
     def _parseDataset(data):
