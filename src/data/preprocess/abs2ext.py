@@ -1,21 +1,18 @@
 """
-Data preprocessing
+Abstractive to extractive conversion.
 """
 
 import argparse
 import spacy
 from datasets import load_dataset, Dataset, DatasetDict, load_from_disk
 from rouge_score.rouge_scorer import RougeScorer
-from transformers import BertTokenizer
-import itertools
-import random
 
 doc2sentences = spacy.load("en_core_web_sm")
 
 
 
 """
-    Converts an abstractive summarization dataset in an extractive dataset.
+    Converts an abstractive summarization dataset into an extractive dataset.
     Uses a greedy approach, iterating over the sentences of the document
     and selecting the one that maximize the ROUGE score.
 
@@ -109,152 +106,39 @@ def _getDatasetAndUtilities(name, dataset_dir):
     return dataset, dataExtractor
 
 
-"""
-    Reduces the tokens of a document by removing sentences that are not part of the summary.
-
-    Parameters
-    ----------
-        sentences : str[]
-            Sentences of the document.
-
-        labels : bool[]
-            Label for each sentence of the document.
-
-        max_tokens : int
-            Maximum number of tokens the document should have.
-
-    Returns
-    -------
-        reduced_sentences : str[]
-        reduced_labels : bool[]
-"""
-def reduceTokens(sentences, labels, max_tokens):
-    total_tokens = sum([ len(sent) for sent in sentences ])
-
-    while total_tokens > max_tokens:
-        # Randomly selects a sentence that is not part of the summary
-        removable_sentences = [i for i, selected in enumerate(labels) if not selected]
-        if len(removable_sentences) == 0: break
-        to_remove_sentence_idx = random.choice(removable_sentences)
-        
-        total_tokens -= len(sentences[to_remove_sentence_idx])
-        del sentences[to_remove_sentence_idx]
-        del labels[to_remove_sentence_idx]
-
-    return sentences, labels
-
-
-"""
-    Parses the summary for BERT.
-    Based on the paper: Text Summarization with Pretrained Encoders.
-
-    Parameters
-    ----------
-        sentences : str[]
-        labels : bool[]
-        tokenizer : BertTokenizer
-        max_tokens : int
-
-    Returns
-    -------
-        doc_ids : str[]
-            Tokenized document.
-
-        segments_ids : int[]
-            Position of each sentence (alternating 0s and 1s to distinguish sentences).
-
-        cls_idxs : int[]
-            Position of [CLS] tokens.
-
-        labels : bool[]
-            Label for each sentence.
-"""
-def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
-    # Each sentence has its own [CLS] (e.g. [CLS] sent1 [SEP] [CLS] sent2 [SEP] [CLS] sent3 [SEP])
-    doc_tokens = ["[CLS]"] + tokenizer.tokenize( " [SEP] [CLS] ".join(sentences) ) + ["[SEP]"]
-    
-    # Reduces the number of tokens of the document
-    tokenized_sentences = [["[CLS]"] + list(y) for x, y in itertools.groupby(doc_tokens, lambda t: t == "[CLS]") if not x]
-    reduced_sentences, reduced_labels = reduceTokens(tokenized_sentences, labels, max_tokens)
-    doc_tokens = list(itertools.chain.from_iterable(reduced_sentences))
-    if len(doc_tokens) > max_tokens:  # In case the document can't be reduced further
-        doc_tokens = doc_tokens[:max_tokens-1] + ["[SEP]"]
-        reduced_labels = reduced_labels[:doc_tokens.count("[CLS]")]
-
-    # doc_tokens = tokenizer.tokenize( " [SEP] [CLS] ".join(sentences) )
-    # doc_tokens = ["[CLS]"] + doc_tokens[:max_tokens-2] + ["[SEP]"]
-    # reduced_labels = labels
-
-    doc_ids = tokenizer.convert_tokens_to_ids(doc_tokens)
-
-    # Segments with alternating 0s and 1s
-    segments_ids = [0] * len(doc_ids)
-    curr_segment = 0
-    for i, token in enumerate(doc_ids):
-        segments_ids[i] = curr_segment
-        if token == tokenizer.vocab["[SEP]"]: curr_segment = 1 - curr_segment
-    segments_ids = segments_ids
-    
-    # Position of [CLS] tokens
-    cls_idxs = [i for i, token in enumerate(doc_ids) if token == tokenizer.vocab["[CLS]"]]
-
-    return doc_ids, segments_ids, cls_idxs, reduced_labels
-
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Dataset preprocessing")
+    parser = argparse.ArgumentParser(prog="Dataset preprocessing - Abstractive to extractive dataset conversion")
     parser.add_argument("--dataset", type=str, choices=["cnn_dailymail", "ms2"], required=True)
     parser.add_argument("--dataset-dir", type=str, help="Directory of the dataset, if not specified, it will be downloaded")
     parser.add_argument("--head", action="store_true", help="Show some rows of the parsed dataset")
     parser.add_argument("--output", type=str, help="Directory where the dataset will be exported to")
     parser.add_argument("--proc", type=int, default=1, help="Number of processes to create")
-    parser.add_argument("--model", type=str, choices=["bert"], help="Model the dataset targets", required=True)
     parser.add_argument("--selection-size", type=int, default=3, help="Number of sentences to select")
-    parser.add_argument("--tokenizer", type=str, default="bert-base-uncased", help="Tokenizer to use")
     args = parser.parse_args()
     
-    random.seed(42)
 
     dataset, dataExtractor = _getDatasetAndUtilities(args.dataset, args.dataset_dir)
-
-
-    tokenizer = None
-    if args.model == "bert": tokenizer = BertTokenizer.from_pretrained(args.tokenizer, do_lower_case=True)
             
     # Dataset parsing
     def _parseDataset(data):
-        out = {}
         document, summary = dataExtractor(data)
         sents, labels = abstractiveToExtractive(document, summary, extractive_size=args.selection_size)
-        out["__full_sentences"] = sents  # Sentences of the document to summarize
-        out["__labels"] = labels    # Boolean associated to each sentence of the document
-        out["__summary"] = summary  # Reference abstractive summary
-
-        if args.model == "bert":
-            doc_ids, segments_ids, cls_idxs, labels = parseForBERT(sents, labels, tokenizer)
-            out["__bert_doc_ids"] = doc_ids
-            out["__bert_segments_ids"] = segments_ids
-            out["__bert_cls_idxs"] = cls_idxs
-            out["__labels"] = labels
-
-        return out
+        return {
+            "__sentences": sents,       # Sentences of the document to summarize
+            "__labels": labels,         # Boolean associated to each sentence of the document
+            "__summary": summary        # Reference abstractive summary
+        }           
     dataset = dataset.map(_parseDataset, num_proc=args.proc)
 
 
     # Splitting
     def _filterDataset(dataset):
         dataset_content = {
-            "full_sentences": dataset["__full_sentences"],    
+            "ids": [i for i in range(len(dataset["__sentences"]))],
+            "sentences": dataset["__sentences"],    
             "ref_summary": dataset["__summary"],    
             "labels": dataset["__labels"]           
         }
-
-        if args.model == "bert":
-            dataset_content["bert_doc_ids"] = dataset["__bert_doc_ids"]
-            dataset_content["bert_segments_ids"] = dataset["__bert_segments_ids"]
-            dataset_content["bert_cls_idxs"] = dataset["__bert_cls_idxs"]
-
         return Dataset.from_dict(dataset_content)
     
     parsed_dataset = {}
@@ -276,15 +160,9 @@ if __name__ == "__main__":
         dataset = parsed_dataset[ list(parsed_dataset.keys())[0] ]
         
         for i in range(min(5, len(dataset))):
-            sentences = []
-            if args.model == "bert":
-                sentences = tokenizer.decode(dataset[i]["bert_doc_ids"]).replace("[SEP]", "").split("[CLS]")
-                del sentences[0]
-            else:
-                sentences = dataset[i]["full_sentences"]
-
-            extractive_sum = "\n".join([ s for j, s in enumerate(sentences) if dataset[i]["labels"][j] ])
-            rouge = scorer.score(dataset[i]["ref_summary"], extractive_sum)
+            sentences = dataset[i]["sentences"]
+            extractive_summ = "\n".join([ s for j, s in enumerate(sentences) if dataset[i]["labels"][j] ])
+            rouge = scorer.score(dataset[i]["ref_summary"], extractive_summ)
             
             print("--- Document sentences ---")
             print("\n".join(sentences))
@@ -293,7 +171,7 @@ if __name__ == "__main__":
             print(dataset[i]["ref_summary"])
             print("---------------------------\n")
             print("--- Extractive summary ---")
-            print(extractive_sum)
+            print(extractive_summ)
             print("--------------------------\n")
             print("--- ROUGE ---")
             print(f"ROUGE-1 \t P={rouge['rouge1'].precision:.4f}\t R={rouge['rouge1'].recall:.4f} \t F1={rouge['rouge1'].fmeasure:.4f}")

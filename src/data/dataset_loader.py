@@ -41,7 +41,7 @@ class SummDatasetBERT(torch.utils.data.Dataset):
     Parameters
     ----------
         path : str
-            Path to the dataset (created with preprocess.py).
+            Path to the preprocessed dataset.
 
         model : bool
             Model the dataset will be created for.
