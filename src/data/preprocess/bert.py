@@ -114,7 +114,7 @@ if __name__ == "__main__":
     random.seed(42)
 
 
-    tokenizer = BertTokenizer.from_pretrained(args.model, do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained(args.model)
     dataset = load_from_disk(args.dataset_dir)
 
     # Dataset parsing
