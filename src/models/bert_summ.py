@@ -47,3 +47,10 @@ class BERTSummarizer(nn.Module):
             out.append( torch.cat((sentences_scores, padding)) )
 
         return torch.stack(out)
+
+    def predict(self, batch, device):
+        ids = batch["ids"].to(device)
+        segments_ids = batch["segments_ids"].to(device)
+        clss_mask = batch["clss_mask"].to(device)
+        bert_mask = batch["bert_mask"].to(device)
+        return self(ids, segments_ids, clss_mask, bert_mask)

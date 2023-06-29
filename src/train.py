@@ -8,43 +8,8 @@ import argparse
 import os
 import random
 from utilities.transformer import NoamScheduler
+from utilities.metrics import accuracy
 
-
-
-def accuracy(labels, predictions):
-    accuracies = []
-
-    for i in range(len(labels)): # Batch handling
-        summary_sentences_idxs = (labels[i] == 1).nonzero(as_tuple=True)[0]
-        selected_sentences_idxs = sorted(torch.topk(predictions[i], len(summary_sentences_idxs)).indices)
-
-        idx_ref, idx_sel = 0, 0
-        correct_choices = 0
-        while idx_ref < len(summary_sentences_idxs) and idx_sel < len(selected_sentences_idxs):
-            if summary_sentences_idxs[idx_ref] == selected_sentences_idxs[idx_sel]:
-                correct_choices += 1
-                idx_ref += 1
-                idx_sel += 1
-            elif summary_sentences_idxs[idx_ref] > selected_sentences_idxs[idx_sel]:
-                idx_sel += 1
-            else:
-                idx_ref += 1
-
-        accuracies.append( correct_choices / len(summary_sentences_idxs) )
-
-    return np.average(accuracies)
-
-
-
-"""
-    Makes a prediction for a BERT-based model
-"""
-def getBERTModelsOutput(model, document_batch, device):
-    ids = document_batch["ids"].to(device)
-    segments_ids = document_batch["segments_ids"].to(device)
-    clss_mask = document_batch["clss_mask"].to(device)
-    bert_mask = document_batch["bert_mask"].to(device)
-    return model(ids, segments_ids, clss_mask, bert_mask)
 
 
 """
@@ -58,8 +23,6 @@ def getBERTModelsOutput(model, document_batch, device):
         train_dataloader : DataLoader
         val_dataloader : DataLoader
         device : Device
-        getModelOutput : (model, batch) -> Tensor
-            Function that makes a prediction with the model on a batch of documents
         epochs : int
             Number of epochs to train.
         starting_epoch : int
@@ -71,7 +34,7 @@ def getBERTModelsOutput(model, document_batch, device):
         checkpoint_best : bool
             If True, a checkpoint will be created each time a model has a better validation accuracy.
 """
-def train(model, getModelOutput, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, checkpoints_path, checkpoints_frequency, checkpoint_best, starting_epoch=1):
+def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, checkpoints_path, checkpoints_frequency, checkpoint_best, starting_epoch=1):
     def _createCheckpoint(path, epoch_num, model, optimizer, avg_loss, avg_accuracy):
         torch.save({
             "epoch": epoch_num,
@@ -100,7 +63,7 @@ def train(model, getModelOutput, loss, optimizer, scheduler, train_dataloader, v
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            outputs = getModelOutput(model, documents, device)
+            outputs = model.predict(documents, device)
             batch_loss = loss(outputs, labels.float())
             batch_loss.backward()
             optimizer.step()
@@ -115,7 +78,7 @@ def train(model, getModelOutput, loss, optimizer, scheduler, train_dataloader, v
             for documents, labels in val_dataloader:
                 labels = labels.to(device)
 
-                outputs = getModelOutput(model, documents, device)
+                outputs = model.predict(documents, device)
                 batch_loss = loss(outputs, labels.float())
 
                 total_val_loss += batch_loss.item()
@@ -208,7 +171,6 @@ if __name__ == "__main__":
     print("-- Starting training --")
     train(
         model = model,
-        getModelOutput = getBERTModelsOutput,
         loss = loss, 
         optimizer = optimizer, 
         scheduler = scheduler,
