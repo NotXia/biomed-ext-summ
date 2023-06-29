@@ -177,7 +177,9 @@ def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     tokenized_sentences = [["[CLS]"] + list(y) for x, y in itertools.groupby(doc_tokens, lambda t: t == "[CLS]") if not x]
     reduced_sentences, reduced_labels = reduceTokens(tokenized_sentences, labels, max_tokens)
     doc_tokens = list(itertools.chain.from_iterable(reduced_sentences))
-    if len(doc_tokens) > max_tokens: doc_tokens = doc_tokens[:max_tokens-1] + ["[SEP]"] # In case the document can't be reduced further
+    if len(doc_tokens) > max_tokens:  # In case the document can't be reduced further
+        doc_tokens = doc_tokens[:max_tokens-1] + ["[SEP]"]
+        reduced_labels = reduced_labels[:doc_tokens.count("[CLS]")]
 
     # doc_tokens = tokenizer.tokenize( " [SEP] [CLS] ".join(sentences) )
     # doc_tokens = ["[CLS]"] + doc_tokens[:max_tokens-2] + ["[SEP]"]
