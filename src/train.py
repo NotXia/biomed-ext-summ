@@ -16,7 +16,7 @@ from metrics.logger import MetricsLogger
 
 def writeHistoryHeader(history_path):
     with open(history_path, "w") as f:
-        f.write("epoch;train_loss;train_acc;val_loss;val_train;val_r1_p;val_r1_r;val_r1_f1;val_r2_p;val_r2_r;val_r2_f1;val_rl_p;val_rl_r;val_rl_f1\n")
+        f.write("epoch;train_loss;train_acc;val_loss;val_acc;val_r1_p;val_r1_r;val_r1_f1;val_r2_p;val_r2_r;val_r2_f1;val_rl_p;val_rl_r;val_rl_f1\n")
 
 def writeHistoryEntry(history_path, epoch, train_metrics, val_metrics):
     with open(history_path, "a") as f:
