@@ -8,7 +8,9 @@ import argparse
 import os
 import random
 from utilities.transformer import NoamScheduler
-from utilities.metrics import accuracy
+from metrics.accuracy import accuracy
+from metrics.rouge import evalROUGE
+from metrics.accumulator import MetricsAccumulator
 
 
 
@@ -38,31 +40,26 @@ from utilities.metrics import accuracy
         model_family : str
             Name of the the model type (e.g. bert)
 """
-def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, 
+def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, tokenizer,
           checkpoints_path, checkpoints_frequency, checkpoint_best, model_name, model_family, starting_epoch=1):
-    def _createCheckpoint(path, epoch_num, model, model_name, model_family, optimizer, avg_loss, avg_accuracy):
+    def _createCheckpoint(path, epoch_num, model, model_name, model_family, optimizer, metrics):
         torch.save({
             "epoch": epoch_num,
             "model_state_dict": model.state_dict(),
             "model_name": model_name,
             "model_family": model_family,
             "optimizer_state_dict": optimizer.state_dict(),
-            "val_loss": avg_loss,
-            "val_accuracy": avg_accuracy,
+            "metrics": metrics
         }, path)
 
     epochs = epochs + starting_epoch - 1
     curr_best_val_accurary = -1
-    total_train_loss, total_train_accuracy = 0, 0
-    total_val_loss, total_val_accuracy = 0, 0
-    avg_train_loss, avg_train_accurary = 0, 0
-    avg_val_loss, avg_val_accurary = 0, 0
+    train_metrics = MetricsAccumulator()
+    val_metrics = MetricsAccumulator()
 
     for epoch_num in range(starting_epoch, epochs+1):
-        total_train_loss, total_train_accuracy = 0, 0
-        total_val_loss, total_val_accuracy = 0, 0
-        avg_train_loss, avg_train_accurary = 0, 0
-        avg_val_loss, avg_val_accurary = 0, 0
+        train_metrics.reset()
+        val_metrics.reset()
 
         # Training
         model.train()
@@ -75,8 +72,8 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
             batch_loss.backward()
             optimizer.step()
 
-            total_train_loss += batch_loss.item()
-            total_train_accuracy += accuracy(labels, outputs)
+            train_metrics.add("loss", batch_loss.item())
+            train_metrics.add("accuracy", accuracy(labels, outputs))
         scheduler.step()
 
         # Validation
@@ -88,45 +85,39 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
                 outputs = model.predict(documents, device)
                 batch_loss = loss(outputs, labels.float())
 
-                total_val_loss += batch_loss.item()
-                total_val_accuracy += accuracy(labels, outputs)
+                val_metrics.add("loss", batch_loss.item())
+                val_metrics.add("accuracy", accuracy(labels, outputs))
+                val_metrics.add("rouge", evalROUGE(model, tokenizer, documents, labels, outputs))
 
-        avg_train_loss = total_train_loss / len(train_dataloader)
-        avg_train_accurary = total_train_accuracy / len(train_dataloader)
-        avg_val_loss = total_val_loss / len(val_dataloader)
-        avg_val_accurary = total_val_accuracy / len(val_dataloader)
+        print(f"Train: {train_metrics.format(['loss', 'accuracy'])}")
+        print(f"Val: {val_metrics.format(['loss', 'accuracy', 'rouge'])}")
 
-        print( 
-            f"Train loss: {avg_train_loss:.6f} | Val loss: {avg_val_loss:.6f} | " +
-            f"Train acc: {avg_train_accurary:.6f} | Val acc: {avg_val_accurary:.6f}"
-        )
 
         # Checkpoints
         if epoch_num % checkpoints_frequency == 0:
             print("Saving checkpoint")
             _createCheckpoint(
                 os.path.join(checkpoints_path, f"cp_e{epoch_num}.tar"), 
-                epoch_num, model, model_name, model_family, optimizer, avg_val_loss, avg_val_accurary
+                epoch_num, model, model_name, model_family, optimizer, val_metrics.averages()
             )
 
-        if avg_val_accurary > curr_best_val_accurary and checkpoint_best:
+        if val_metrics.averages()["accuracy"] > curr_best_val_accurary and checkpoint_best:
             print("Saving checkpoint for best model")
             _createCheckpoint(
                 os.path.join(checkpoints_path, f"cp_best.tar"), 
-                epoch_num, model, model_name, model_family, optimizer, avg_val_loss, avg_val_accurary
+                epoch_num, model, model_name, model_family, optimizer, val_metrics.averages()
             )
 
             with open(os.path.join(checkpoints_path, f"best.txt"), "w") as f:
                 f.write(
                     f"Epoch {epoch_num} | " +
-                    f"Train loss: {avg_train_loss:.6f} | Val loss: {avg_val_loss:.6f} | " +
-                    f"Train acc: {avg_train_accurary:.6f} | Val acc: {avg_val_accurary:.6f}"
+                    f"{val_metrics.format(['loss', 'accuracy', 'rouge'])}"
                 )
 
     print("Saving final checkpoint")
     _createCheckpoint(
         os.path.join(checkpoints_path, f"cp_e{epoch_num}.tar"), 
-        epoch_num, model, model_name, model_family, optimizer, avg_val_loss, avg_val_accurary
+        epoch_num, model, model_name, model_family, optimizer, val_metrics.averages()
     )
 
 
@@ -189,6 +180,7 @@ if __name__ == "__main__":
         scheduler = scheduler,
         train_dataloader = train_dataloader, 
         val_dataloader = val_dataloader, 
+        tokenizer = tokenizer,
         epochs = args.epochs,
         starting_epoch = starting_epoch,
         device = device,

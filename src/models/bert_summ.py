@@ -48,9 +48,31 @@ class BERTSummarizer(nn.Module):
 
         return torch.stack(out)
 
+
+    """ Makes a prediction from a batch """
     def predict(self, batch, device):
         ids = batch["ids"].to(device)
         segments_ids = batch["segments_ids"].to(device)
         clss_mask = batch["clss_mask"].to(device)
         bert_mask = batch["bert_mask"].to(device)
         return self(ids, segments_ids, clss_mask, bert_mask)
+    
+
+    """ Return the selected sentences in a decoded form """
+    def buildSummary(self, predictions, summary_size, tokens_ids, clss_mask, tokenizer):
+        selected_sents = sorted(torch.topk(predictions, summary_size).indices)
+        clss_idxs = (clss_mask == 1).nonzero(as_tuple=True)[0]
+        summary = []
+
+        for selected in selected_sents:
+            sent_cls = clss_idxs[selected]
+            sent_sep = -1
+            if selected+1 < len(clss_idxs):
+                sent_sep = clss_idxs[selected+1] - 1
+            else:
+                sent_sep = len(clss_idxs) - 1
+
+            sentence = tokenizer.decode( tokens_ids[sent_cls+1 : sent_sep] )
+            summary.append(sentence)
+
+        return summary

@@ -6,6 +6,7 @@ def accuracy(labels, predictions):
 
     for i in range(len(labels)): # Batch handling
         summary_sentences_idxs = (labels[i] == 1).nonzero(as_tuple=True)[0]
+        if len(summary_sentences_idxs) == 0: continue # Not able to evaluate if none of the sentences are part of the sentence
         selected_sentences_idxs = sorted(torch.topk(predictions[i], len(summary_sentences_idxs)).indices)
 
         idx_ref, idx_sel = 0, 0
