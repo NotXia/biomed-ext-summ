@@ -94,7 +94,6 @@ def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     for i, token in enumerate(doc_ids):
         segments_ids[i] = curr_segment
         if token == tokenizer.vocab["[SEP]"]: curr_segment = 1 - curr_segment
-    segments_ids = segments_ids
     
     # Position of [CLS] tokens
     cls_idxs = [i for i, token in enumerate(doc_ids) if token == tokenizer.vocab["[CLS]"]]
