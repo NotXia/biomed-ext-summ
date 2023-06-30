@@ -130,10 +130,13 @@ if __name__ == "__main__":
 
     # Splitting
     def _filterDataset(dataset):
+        for data in dataset:
+            assert len(data["__labels"]) == len(data["__bert_cls_idxs"])
+            
         dataset_content = {
             "ids": dataset["ids"],    
             "ref_summary": dataset["ref_summary"],    
-            "labels": dataset["labels"],
+            "labels": dataset["__labels"],
             "bert_doc_ids": dataset["__bert_doc_ids"],
             "bert_segments_ids": dataset["__bert_segments_ids"],
             "bert_cls_idxs": dataset["__bert_cls_idxs"]
