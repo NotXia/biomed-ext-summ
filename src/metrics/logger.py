@@ -4,7 +4,7 @@ import numpy as np
 """
     Keeps track of metrics and their averages.
 """
-class MetricsAccumulator():
+class MetricsLogger():
     def __init__(self):
         self.reset()
 

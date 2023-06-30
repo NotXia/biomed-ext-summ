@@ -10,7 +10,7 @@ import random
 from utilities.transformer import NoamScheduler
 from metrics.accuracy import accuracy
 from metrics.rouge import evalROUGE
-from metrics.accumulator import MetricsAccumulator
+from metrics.logger import MetricsLogger
 
 
 
@@ -37,25 +37,22 @@ from metrics.accumulator import MetricsAccumulator
             If True, a checkpoint will be created each time a model has a better validation accuracy.
         model_name : str
             Name of the pretrained model (e.g. bert-base-uncased)
-        model_family : str
-            Name of the the model type (e.g. bert)
 """
 def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, tokenizer,
-          checkpoints_path, checkpoints_frequency, checkpoint_best, model_name, model_family, starting_epoch=1):
-    def _createCheckpoint(path, epoch_num, model, model_name, model_family, optimizer, metrics):
+          checkpoints_path, checkpoints_frequency, checkpoint_best, model_name, starting_epoch=1):
+    def _createCheckpoint(path, epoch_num, model, model_name, optimizer, metrics):
         torch.save({
             "epoch": epoch_num,
             "model_state_dict": model.state_dict(),
             "model_name": model_name,
-            "model_family": model_family,
             "optimizer_state_dict": optimizer.state_dict(),
             "metrics": metrics
         }, path)
 
     epochs = epochs + starting_epoch - 1
     curr_best_val_accurary = -1
-    train_metrics = MetricsAccumulator()
-    val_metrics = MetricsAccumulator()
+    train_metrics = MetricsLogger()
+    val_metrics = MetricsLogger()
 
     for epoch_num in range(starting_epoch, epochs+1):
         train_metrics.reset()
@@ -98,14 +95,14 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
             print("Saving checkpoint")
             _createCheckpoint(
                 os.path.join(checkpoints_path, f"cp_e{epoch_num}.tar"), 
-                epoch_num, model, model_name, model_family, optimizer, val_metrics.averages()
+                epoch_num, model, model_name, optimizer, val_metrics.averages()
             )
 
         if val_metrics.averages()["accuracy"] > curr_best_val_accurary and checkpoint_best:
             print("Saving checkpoint for best model")
             _createCheckpoint(
                 os.path.join(checkpoints_path, f"cp_best.tar"), 
-                epoch_num, model, model_name, model_family, optimizer, val_metrics.averages()
+                epoch_num, model, model_name, optimizer, val_metrics.averages()
             )
 
             with open(os.path.join(checkpoints_path, f"best.txt"), "w") as f:
@@ -117,14 +114,13 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
     print("Saving final checkpoint")
     _createCheckpoint(
         os.path.join(checkpoints_path, f"cp_e{epoch_num}.tar"), 
-        epoch_num, model, model_name, model_family, optimizer, val_metrics.averages()
+        epoch_num, model, model_name, optimizer, val_metrics.averages()
     )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Model training")
     parser.add_argument("--model", type=str, required=True, help="Model to use as starting point (e.g. bert-base-uncased)")
-    parser.add_argument("--model-family", type=str, choices=["bert"], required=True, help="Family of the model")
     parser.add_argument("--dataset", type=str, required=True, help="Path to a preprocesses dataset")
     parser.add_argument("--epochs", type=int, required=True, help="Number of epochs to train")
     parser.add_argument("--warmup", type=int, default=1, help="Number of warm-up steps")
@@ -145,13 +141,9 @@ if __name__ == "__main__":
     if torch.cuda.is_available(): os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = None
-    if args.model_family == "bert": 
-        model = BERTSummarizer(args.model).to(device)
-    else:
-        raise NotImplementedError(f"{args.model_family} not available")
+    model = BERTSummarizer(args.model).to(device)
     tokenizer = BertTokenizer.from_pretrained(args.model)
-    datasets = load_dataset(args.dataset, args.model_family, tokenizer=tokenizer, splits=["train", "validation"])
+    datasets = load_dataset(args.dataset, tokenizer=tokenizer, splits=["train", "validation"])
     train_dataloader = torch.utils.data.DataLoader(datasets["train"], batch_size=args.batch_size)
     val_dataloader = torch.utils.data.DataLoader(datasets["validation"], batch_size=args.batch_size)
     loss = torch.nn.BCELoss().to(device)
@@ -174,7 +166,6 @@ if __name__ == "__main__":
     train(
         model = model,
         model_name = args.model,
-        model_family = args.model_family,
         loss = loss, 
         optimizer = optimizer, 
         scheduler = scheduler,

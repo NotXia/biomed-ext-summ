@@ -44,14 +44,11 @@ class SummDatasetBERT(torch.utils.data.Dataset):
         path : str
             Path to the preprocessed dataset.
 
-        model : bool
-            Model the dataset will be created for.
-
         splits : str[]
             Splits to parse from the source dataset. If not specified, all splits will be processed.
 
         tokenizer : Tokenizer
-            Tokenizer for the model (required for BERT)
+            Tokenizer of the model 
 
     Returns
     -------
@@ -59,15 +56,12 @@ class SummDatasetBERT(torch.utils.data.Dataset):
             Dictionary mapping the split to the Dataset object.
 
 """
-def load_dataset(path, model, splits=[], tokenizer=None):
+def load_dataset(path, splits=[], tokenizer=None):
     dataset = load_from_disk(path)
     out = {}
 
-    if model == "bert":
-        if tokenizer == None: raise ValueError("Missing BERT tokenizer")
-        for split_name in (splits if len(splits) > 0 else dataset):
-            out[split_name] = SummDatasetBERT(dataset[split_name], tokenizer)
-    else:
-        raise NotImplementedError(f"Model {model} not available")
+    if tokenizer == None: raise ValueError("Missing BERT tokenizer")
+    for split_name in (splits if len(splits) > 0 else dataset):
+        out[split_name] = SummDatasetBERT(dataset[split_name], tokenizer)
 
     return out
