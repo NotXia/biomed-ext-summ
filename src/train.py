@@ -14,6 +14,24 @@ from metrics.logger import MetricsLogger
 
 
 
+def writeHistoryHeader(history_path):
+    with open(history_path, "w") as f:
+        f.write("epoch;train_loss;train_acc;val_loss;val_train;val_r1_p;val_r1_r;val_r1_f1;val_r2_p;val_r2_r;val_r2_f1;val_rl_p;val_rl_r;val_rl_f1\n")
+
+def writeHistoryEntry(history_path, epoch, train_metrics, val_metrics):
+    with open(history_path, "a") as f:
+        train_avgs = train_metrics.averages()
+        val_avgs = val_metrics.averages()
+
+        f.write(
+            f"{epoch};{train_avgs['loss']};{train_avgs['accuracy']};{val_avgs['loss']};{val_avgs['accuracy']};" +
+            f"{val_avgs['rouge1']['precision']};{val_avgs['rouge1']['recall']};{val_avgs['rouge1']['fmeasure']};" +
+            f"{val_avgs['rouge2']['precision']};{val_avgs['rouge2']['recall']};{val_avgs['rouge2']['fmeasure']};" +
+            f"{val_avgs['rougeL']['precision']};{val_avgs['rougeL']['recall']};{val_avgs['rougeL']['fmeasure']}"
+        )
+        f.write("\n")
+
+
 """
     Training loop.
 
@@ -29,6 +47,8 @@ from metrics.logger import MetricsLogger
             Number of epochs to train.
         starting_epoch : int
             Number from where the epoch count will start.
+        history_path : str
+            CSV file where the training history will be stored.
         checkpoints_path : str
             Directory where the checkpoints will be stored.
         checkpoints_frequency : int
@@ -39,7 +59,7 @@ from metrics.logger import MetricsLogger
             Name of the pretrained model (e.g. bert-base-uncased)
 """
 def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, tokenizer,
-          checkpoints_path, checkpoints_frequency, checkpoint_best, model_name, starting_epoch=1):
+          history_path, checkpoints_path, checkpoints_frequency, checkpoint_best, model_name, starting_epoch=1):
     def _createCheckpoint(path, epoch_num, model, model_name, optimizer, metrics):
         torch.save({
             "epoch": epoch_num,
@@ -91,32 +111,22 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
 
 
         # Checkpoints
-        if epoch_num % checkpoints_frequency == 0:
-            print("Saving checkpoint")
-            _createCheckpoint(
-                os.path.join(checkpoints_path, f"cp_e{epoch_num}.tar"), 
-                epoch_num, model, model_name, optimizer, val_metrics.averages()
-            )
+        is_best_model = (val_metrics.averages()["accuracy"] > curr_best_val_accurary and checkpoint_best)
+        is_final_epoch = (epoch_num == epochs)
+        if epoch_num % checkpoints_frequency == 0 or is_best_model or is_final_epoch:
+            checkpoint_path = os.path.join(checkpoints_path, f"cp_{model_name.replace('/', '_')}_ep{epoch_num}.tar")
+            print(f"Saving checkpoint at {checkpoint_path}")
+            _createCheckpoint(checkpoint_path, epoch_num, model, model_name, optimizer, val_metrics.averages())
 
-        if val_metrics.averages()["accuracy"] > curr_best_val_accurary and checkpoint_best:
-            print("Saving checkpoint for best model")
-            _createCheckpoint(
-                os.path.join(checkpoints_path, f"cp_best.tar"), 
-                epoch_num, model, model_name, optimizer, val_metrics.averages()
-            )
+            if is_best_model:
+                curr_best_val_accurary = val_metrics.averages()["accuracy"]
+                with open(os.path.join(checkpoints_path, f"best.txt"), "w") as f:
+                    f.write(
+                        f"Epoch {epoch_num} | " +
+                        f"{val_metrics.format(['loss', 'accuracy', 'rouge'])}"
+                    )
 
-            with open(os.path.join(checkpoints_path, f"best.txt"), "w") as f:
-                f.write(
-                    f"Epoch {epoch_num} | " +
-                    f"{val_metrics.format(['loss', 'accuracy', 'rouge'])}"
-                )
-
-    print("Saving final checkpoint")
-    _createCheckpoint(
-        os.path.join(checkpoints_path, f"cp_e{epoch_num}.tar"), 
-        epoch_num, model, model_name, optimizer, val_metrics.averages()
-    )
-
+        writeHistoryEntry(history_path, epoch_num, train_metrics, val_metrics)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Model training")
@@ -131,6 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str, help="Path to the checkpoint to load")
     parser.add_argument("--checkpoint-best", action="store_true", help="Create a checkpoint for the best model")
     parser.add_argument("--checkpoints-path", type=str, default="./__checkpoints__", help="Directory where the checkpoints will be stored")
+    parser.add_argument("--history-path", type=str, default="./__checkpoints__/history.csv", help="CSV file where the training history will be stored")
     parser.add_argument("--checkpoints-freq", type=int, default=100, help="Number of epochs after which a checkpoint will be created")
     args = parser.parse_args()
 
@@ -162,6 +173,8 @@ if __name__ == "__main__":
         starting_epoch = checkpoint["epoch"] + 1
         scheduler.epoch = checkpoint["epoch"]
 
+    writeHistoryHeader(args.history_path)
+
     print("-- Starting training --")
     train(
         model = model,
@@ -175,6 +188,7 @@ if __name__ == "__main__":
         epochs = args.epochs,
         starting_epoch = starting_epoch,
         device = device,
+        history_path = args.history_path,
         checkpoints_path = args.checkpoints_path,
         checkpoints_frequency = args.checkpoints_freq,
         checkpoint_best = args.checkpoint_best
