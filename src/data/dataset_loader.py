@@ -26,7 +26,8 @@ class SummDatasetBERT(torch.utils.data.Dataset):
                 "segments_ids": torch.tensor( padToSize(segments_ids, input_size, 0) ),
                 "clss_mask":    torch.tensor( clss_mask ),
                 "bert_mask":    torch.tensor( padToSize(bert_mask, input_size, 0) ).unsqueeze(0),
-                "ref_summary": data["ref_summary"]
+                "ref_summary":  data["ref_summary"],
+                "num_sentences": len(data["labels"])
             })
 
     def __len__(self):

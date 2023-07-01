@@ -7,7 +7,7 @@ import numpy as np
 import argparse
 import os
 import random
-from utilities.transformer import NoamScheduler
+# from utilities.transformer import NoamScheduler
 from metrics.recall import recall
 from metrics.rouge import evalROUGE
 from metrics.logger import MetricsLogger
@@ -30,6 +30,25 @@ def writeHistoryEntry(history_path, epoch, train_metrics, val_metrics):
             f"{val_avgs['rougeL']['precision']};{val_avgs['rougeL']['recall']};{val_avgs['rougeL']['fmeasure']}"
         )
         f.write("\n")
+
+
+"""
+    Computes the average loss of each document of the batch ignoring paddings
+"""
+def perSentenceLoss(loss, batch_predictions, batch_labels, batch_num_sentences):
+    total_loss = 0.0
+
+    for batch_i in range(len(batch_predictions)):
+        predictions = batch_predictions[batch_i]
+        labels = batch_labels[batch_i]
+        num_sentences = batch_num_sentences[batch_i]
+
+        predictions = predictions[:num_sentences]
+        labels = labels[:num_sentences]
+
+        total_loss += loss(predictions, labels)
+
+    return total_loss / len(batch_predictions)
 
 
 """
@@ -81,11 +100,11 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
         # Training
         model.train()
         for documents, labels in tqdm(train_dataloader, desc=f"Epoch {epoch_num}/{epochs}"):
-            labels = labels.to(device)
+            labels = labels.float().to(device)
 
             optimizer.zero_grad()
             outputs = model.predict(documents, device)
-            batch_loss = loss(outputs, labels.float())
+            batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
             batch_loss.backward()
             optimizer.step()
 
@@ -97,10 +116,10 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
         model.eval()
         with torch.no_grad():
             for documents, labels in tqdm(val_dataloader, desc=f"Validation"):
-                labels = labels.to(device)
+                labels = labels.float().to(device)
 
                 outputs = model.predict(documents, device)
-                batch_loss = loss(outputs, labels.float())
+                batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
 
                 val_metrics.add("loss", batch_loss.item())
                 val_metrics.add("recall", recall(labels, outputs))
@@ -133,9 +152,9 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, required=True, help="Model to use as starting point (e.g. bert-base-uncased)")
     parser.add_argument("--dataset", type=str, required=True, help="Path to a preprocesses dataset")
     parser.add_argument("--epochs", type=int, required=True, help="Number of epochs to train")
-    parser.add_argument("--warmup", type=int, default=1, help="Number of warm-up steps")
+    # parser.add_argument("--warmup", type=int, default=1, help="Number of warm-up steps")
     parser.add_argument("--batch-size", type=int, required=True)
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.999)
     parser.add_argument("--checkpoint", type=str, help="Path to the checkpoint to load")
@@ -159,7 +178,8 @@ if __name__ == "__main__":
     val_dataloader = torch.utils.data.DataLoader(datasets["validation"], batch_size=args.batch_size)
     loss = torch.nn.BCELoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
-    scheduler = NoamScheduler(optimizer, args.warmup, model.scheduler_d_model)
+    # scheduler = NoamScheduler(optimizer, args.warmup, model.scheduler_d_model)
+    scheduler = None
     starting_epoch = 1
 
     if not os.path.exists(args.checkpoints_path):
@@ -171,7 +191,7 @@ if __name__ == "__main__":
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         starting_epoch = checkpoint["epoch"] + 1
-        scheduler.epoch = checkpoint["epoch"]
+        # scheduler.epoch = checkpoint["epoch"]
 
     writeHistoryHeader(args.history_path)
 
