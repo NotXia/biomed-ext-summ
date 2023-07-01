@@ -11,7 +11,7 @@ class MetricsLogger():
 
     def reset(self):
         self.total_loss = []
-        self.total_accuracy = []
+        self.total_recall = []
         self.total_rouge1 = { "fmeasure": [], "precision": [], "recall": [] }
         self.total_rouge2 = { "fmeasure": [], "precision": [], "recall": [] }
         self.total_rougeL = { "fmeasure": [], "precision": [], "recall": [] }
@@ -20,8 +20,8 @@ class MetricsLogger():
     def add(self, type, value):
         if type == "loss":
             self.total_loss.append(value)
-        elif type == "accuracy":
-            self.total_accuracy.append(value)
+        elif type == "recall":
+            self.total_recall.append(value)
         elif type == "rouge":
             self.total_rouge1["fmeasure"].append(value["rouge1"]["fmeasure"])
             self.total_rouge1["precision"].append(value["rouge1"]["precision"])
@@ -37,7 +37,7 @@ class MetricsLogger():
     def averages(self):
         return {
             "loss": np.average(self.total_loss),
-            "accuracy": np.average(self.total_accuracy),
+            "recall": np.average(self.total_recall),
             "rouge1": {
                 "recall": np.average(self.total_rouge1["recall"]),
                 "precision": np.average(self.total_rouge1["precision"]),
@@ -62,8 +62,8 @@ class MetricsLogger():
 
         if "loss" in types:
             out += f"Loss {avgs['loss']:.5f} | "
-        if "accuracy" in types:
-            out += f"Accuracy {avgs['accuracy']:.5f} | "
+        if "recall" in types:
+            out += f"Recall {avgs['recall']:.5f} | "
         if "rouge" in types:
             out += f"ROUGE-1 r: {avgs['rouge1']['recall']:.5f} -- p: {avgs['rouge1']['precision']:.5f} -- f1: {avgs['rouge1']['fmeasure']:.5f} | "
             out += f"ROUGE-2 r: {avgs['rouge2']['recall']:.5f} -- p: {avgs['rouge2']['precision']:.5f} -- f1: {avgs['rouge2']['fmeasure']:.5f} | "

@@ -8,7 +8,7 @@ import argparse
 import os
 import random
 from utilities.transformer import NoamScheduler
-from metrics.accuracy import accuracy
+from metrics.recall import recall
 from metrics.rouge import evalROUGE
 from metrics.logger import MetricsLogger
 
@@ -16,7 +16,7 @@ from metrics.logger import MetricsLogger
 
 def writeHistoryHeader(history_path):
     with open(history_path, "w") as f:
-        f.write("epoch;train_loss;train_acc;val_loss;val_acc;val_r1_p;val_r1_r;val_r1_f1;val_r2_p;val_r2_r;val_r2_f1;val_rl_p;val_rl_r;val_rl_f1\n")
+        f.write("epoch;train_loss;train_recall;val_loss;val_recall;val_r1_p;val_r1_r;val_r1_f1;val_r2_p;val_r2_r;val_r2_f1;val_rl_p;val_rl_r;val_rl_f1\n")
 
 def writeHistoryEntry(history_path, epoch, train_metrics, val_metrics):
     with open(history_path, "a") as f:
@@ -24,7 +24,7 @@ def writeHistoryEntry(history_path, epoch, train_metrics, val_metrics):
         val_avgs = val_metrics.averages()
 
         f.write(
-            f"{epoch};{train_avgs['loss']};{train_avgs['accuracy']};{val_avgs['loss']};{val_avgs['accuracy']};" +
+            f"{epoch};{train_avgs['loss']};{train_avgs['recall']};{val_avgs['loss']};{val_avgs['recall']};" +
             f"{val_avgs['rouge1']['precision']};{val_avgs['rouge1']['recall']};{val_avgs['rouge1']['fmeasure']};" +
             f"{val_avgs['rouge2']['precision']};{val_avgs['rouge2']['recall']};{val_avgs['rouge2']['fmeasure']};" +
             f"{val_avgs['rougeL']['precision']};{val_avgs['rougeL']['recall']};{val_avgs['rougeL']['fmeasure']}"
@@ -54,7 +54,7 @@ def writeHistoryEntry(history_path, epoch, train_metrics, val_metrics):
         checkpoints_frequency : int
             Number of epochs after which a checkpoint will be created.
         checkpoint_best : bool
-            If True, a checkpoint will be created each time a model has a better validation accuracy.
+            If True, a checkpoint will be created each time a model has a better validation recall.
         model_name : str
             Name of the pretrained model (e.g. bert-base-uncased)
 """
@@ -70,7 +70,7 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
         }, path)
 
     epochs = epochs + starting_epoch - 1
-    curr_best_val_accurary = -1
+    curr_best_val_recall = -1
     train_metrics = MetricsLogger()
     val_metrics = MetricsLogger()
 
@@ -90,8 +90,8 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
             optimizer.step()
 
             train_metrics.add("loss", batch_loss.item())
-            train_metrics.add("accuracy", accuracy(labels, outputs))
-        scheduler.step()
+            train_metrics.add("recall", recall(labels, outputs))
+        # scheduler.step()
 
         # Validation
         model.eval()
@@ -103,15 +103,15 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
                 batch_loss = loss(outputs, labels.float())
 
                 val_metrics.add("loss", batch_loss.item())
-                val_metrics.add("accuracy", accuracy(labels, outputs))
+                val_metrics.add("recall", recall(labels, outputs))
                 val_metrics.add("rouge", evalROUGE(model, tokenizer, documents, labels, outputs))
 
-        print(f"Train: {train_metrics.format(['loss', 'accuracy'])}")
-        print(f"Val: {val_metrics.format(['loss', 'accuracy', 'rouge'])}")
+        print(f"Train: {train_metrics.format(['loss', 'recall'])}")
+        print(f"Val: {val_metrics.format(['loss', 'recall', 'rouge'])}")
 
 
         # Checkpoints
-        is_best_model = (val_metrics.averages()["accuracy"] > curr_best_val_accurary and checkpoint_best)
+        is_best_model = (val_metrics.averages()["recall"] > curr_best_val_recall and checkpoint_best)
         is_final_epoch = (epoch_num == epochs)
         if epoch_num % checkpoints_frequency == 0 or is_best_model or is_final_epoch:
             checkpoint_path = os.path.join(checkpoints_path, f"cp_{model_name.replace('/', '_')}_ep{epoch_num}.tar")
@@ -119,11 +119,11 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
             _createCheckpoint(checkpoint_path, epoch_num, model, model_name, optimizer, val_metrics.averages())
 
             if is_best_model:
-                curr_best_val_accurary = val_metrics.averages()["accuracy"]
+                curr_best_val_recall = val_metrics.averages()["recall"]
                 with open(os.path.join(checkpoints_path, f"best.txt"), "w") as f:
                     f.write(
                         f"Epoch {epoch_num} | " +
-                        f"{val_metrics.format(['loss', 'accuracy', 'rouge'])}"
+                        f"{val_metrics.format(['loss', 'recall', 'rouge'])}"
                     )
 
         writeHistoryEntry(history_path, epoch_num, train_metrics, val_metrics)

@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 
-def accuracy(labels, predictions):
-    accuracies = []
+def recall(labels, predictions):
+    recall = []
 
     for i in range(len(labels)): # Batch handling
         summary_sentences_idxs = (labels[i] == 1).nonzero(as_tuple=True)[0]
@@ -21,6 +21,6 @@ def accuracy(labels, predictions):
             else:
                 idx_ref += 1
 
-        accuracies.append( correct_choices / len(summary_sentences_idxs) )
+        recall.append( correct_choices / len(summary_sentences_idxs) )
 
-    return np.average(accuracies)
+    return np.average(recall)
