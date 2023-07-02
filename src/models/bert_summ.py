@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 from transformers import BertModel
 from utilities.transformer import PositionalEncoding
+from transformers import BertTokenizer
+from utilities.utilities import padToSize
+from utilities.summary import select
 
 
 
@@ -29,6 +32,8 @@ class TransformerInterEncoder(nn.Module):
 class BERTSummarizer(nn.Module):
     def __init__(self, bert_model="bert-base-uncased", input_size=512):
         super().__init__()
+        self.tokenizer = None
+        self.model_name = bert_model
         self.input_size = input_size
         self.bert = BertModel.from_pretrained(bert_model)
         self.encoder = TransformerInterEncoder(self.bert.config.hidden_size)
@@ -58,6 +63,12 @@ class BERTSummarizer(nn.Module):
         return self(ids, segments_ids, clss_mask, bert_mask)
     
 
+    def getTokenizer(self):
+        if self.tokenizer is None:
+            self.tokenizer = BertTokenizer.from_pretrained(self.model_name)
+        return self.tokenizer
+
+
     """ Return the selected sentences in a decoded form """
     def buildSummary(self, predictions, summary_size, tokens_ids, clss_mask, tokenizer):
         selected_sents = sorted(torch.topk(predictions, summary_size).indices)
@@ -76,3 +87,58 @@ class BERTSummarizer(nn.Module):
             summary.append(sentence)
 
         return summary
+    
+
+    def summarize(self, document, strategy, strategy_args=None, doc2sentences=None):
+        if doc2sentences is None: 
+            import spacy
+            doc2sentences = spacy.load("en_core_web_sm")
+        tokenizer = self.getTokenizer()
+
+        def _splitDocument(doc_tokens, split_size=512):
+            splits = []
+            
+            while len(doc_tokens) > split_size:
+                # Splits at the [SEP] token
+                sep_idx = split_size
+                while doc_tokens[sep_idx] != "[SEP]": sep_idx -= 1
+                splits.append(doc_tokens[:sep_idx+1])
+                doc_tokens = doc_tokens[sep_idx+1:]
+            if len(doc_tokens) != 0: splits.append(doc_tokens) # Remaining part of the document
+            
+            return splits
+
+        doc_sentences = [sent.text.strip() for sent in doc2sentences(document).sents]
+        
+        doc_tokens = tokenizer.tokenize( " [SEP] [CLS] ".join(doc_sentences) )
+        doc_tokens = ["[CLS]"] + doc_tokens + ["[SEP]"]
+        # If the document is too long, split it and process each split separately. 
+        # The resulting predictions a then concatenated.
+        doc_splits = _splitDocument(doc_tokens, self.input_size)
+
+        predictions = torch.tensor([]).to(self.bert.device)
+
+        for split in doc_splits:
+            doc_ids = tokenizer.convert_tokens_to_ids(split)
+
+            segments_ids = [0] * len(doc_ids)
+            curr_segment = 0
+            for i, token in enumerate(doc_ids):
+                segments_ids[i] = curr_segment
+                if token == tokenizer.vocab["[SEP]"]: curr_segment = 1 - curr_segment
+
+            clss_mask = [True if token == tokenizer.vocab["[CLS]"] else False for token in doc_ids]
+            bert_mask = [1 for _ in range(len(doc_ids))]
+
+            # Simulates a batch of size 1
+            doc_ids = torch.as_tensor( [padToSize(doc_ids, 512, tokenizer.vocab["[PAD]"])] ).to(self.bert.device)
+            segments_ids = torch.as_tensor( [padToSize(segments_ids, 512, 0)] ).to(self.bert.device)
+            clss_mask = torch.as_tensor( [padToSize(clss_mask, 512, False)] ).to(self.bert.device)
+            bert_mask = torch.as_tensor( [padToSize(bert_mask, 512, 0)] ).to(self.bert.device)
+
+            self.eval()
+            with torch.no_grad():
+                split_preds = self(doc_ids, segments_ids, clss_mask, bert_mask)[0][:split.count("[CLS]")]
+                predictions = torch.cat((predictions, split_preds))
+
+        return select(doc_sentences, predictions, strategy, strategy_args)
