@@ -154,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, required=True, help="Number of epochs to train")
     # parser.add_argument("--warmup", type=int, default=1, help="Number of warm-up steps")
     parser.add_argument("--batch-size", type=int, required=True)
-    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate")
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.999)
     parser.add_argument("--checkpoint", type=str, help="Path to the checkpoint to load")
