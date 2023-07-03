@@ -103,8 +103,8 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         starting_epoch = checkpoint["epoch"] + 1
 
-    writeHistoryHeader(history_path)
     if not os.path.exists(checkpoints_path): os.makedirs(checkpoints_path)
+    writeHistoryHeader(history_path)
 
     epochs = epochs + starting_epoch - 1
     for epoch_num in range(starting_epoch, epochs+1):
