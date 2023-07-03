@@ -1,15 +1,19 @@
 from rouge_score.rouge_scorer import RougeScorer
 
-def evalROUGE(model, tokenizer, documents, labels, predictions):
+
+"""
+    ROUGE scores for a batch
+"""
+def evalROUGE(ref_summaries, ext_summaries):
     total_rouge1 = { "precision": 0, "recall": 0, "fmeasure": 0 }
     total_rouge2 = { "precision": 0, "recall": 0, "fmeasure": 0 }
     total_rougeL = { "precision": 0, "recall": 0, "fmeasure": 0 }
     scorer = RougeScorer(["rouge1", "rouge2", "rougeL"])
+    batch_size = len(ref_summaries)
 
-    for i in range(len(labels)): # Batch handling
-        ref_summary = documents["ref_summary"][i]
-        ext_summary_size = len( (labels[i] == 1).nonzero(as_tuple=True)[0] )
-        ext_summary = "\n".join( model.buildSummary(predictions[i], ext_summary_size, documents["ids"][i], documents["clss_mask"][i], tokenizer) )
+    for i in range(batch_size): # Batch handling
+        ref_summary = ref_summaries[i]
+        ext_summary = ext_summaries[i]
 
         rouge_scores = scorer.score(ref_summary, ext_summary)
         total_rouge1["fmeasure"] += rouge_scores["rouge1"].fmeasure
@@ -24,18 +28,18 @@ def evalROUGE(model, tokenizer, documents, labels, predictions):
     
     return {
         "rouge1": {
-            "fmeasure": total_rouge1["fmeasure"] / len(labels),
-            "precision": total_rouge1["precision"] / len(labels),
-            "recall": total_rouge1["recall"] / len(labels)
+            "fmeasure": total_rouge1["fmeasure"] / batch_size,
+            "precision": total_rouge1["precision"] / batch_size,
+            "recall": total_rouge1["recall"] / batch_size
         },
         "rouge2": {
-            "fmeasure": total_rouge2["fmeasure"] / len(labels),
-            "precision": total_rouge2["precision"] / len(labels),
-            "recall": total_rouge2["recall"] / len(labels)
+            "fmeasure": total_rouge2["fmeasure"] / batch_size,
+            "precision": total_rouge2["precision"] / batch_size,
+            "recall": total_rouge2["recall"] / batch_size
         },
         "rougeL": {
-            "fmeasure": total_rougeL["fmeasure"] / len(labels),
-            "precision": total_rougeL["precision"] / len(labels),
-            "recall": total_rougeL["recall"] / len(labels)
+            "fmeasure": total_rougeL["fmeasure"] / batch_size,
+            "precision": total_rougeL["precision"] / batch_size,
+            "recall": total_rougeL["recall"] / batch_size
         }
     }

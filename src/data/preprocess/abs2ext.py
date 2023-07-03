@@ -134,7 +134,7 @@ if __name__ == "__main__":
     # Splitting
     def _filterDataset(dataset):
         dataset_content = {
-            "ids": [i for i in range(len(dataset["__sentences"]))],
+            "id": [i for i in range(len(dataset["__sentences"]))],
             "sentences": dataset["__sentences"],    
             "ref_summary": dataset["__summary"],    
             "labels": dataset["__labels"]           

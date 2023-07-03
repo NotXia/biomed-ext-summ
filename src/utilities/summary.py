@@ -2,7 +2,6 @@ import torch
 
 
 def _selectStrategyLength(sentences, predictions, max_length):
-    print(len(sentences), len(predictions))
     selected_sents = []
     sents_priority = torch.argsort(predictions, descending=True)
     summary_len = 0
@@ -42,6 +41,6 @@ def select(sentences, predictions, strategy, strategy_args):
     elif strategy == "threshold":
         selected_sents = _selectStrategyThreshold(sentences, predictions, strategy_args)
     else:
-        raise NotImplemented(f"Unknown strategy {strategy}")
+        raise NotImplementedError(f"Unknown strategy {strategy}")
     
-    return [sentences[i] for i in selected_sents]
+    return [sentences[i] for i in selected_sents], selected_sents

@@ -1,4 +1,4 @@
-from models.bert_summ import BERTSummarizer
+from models.loader import loadModel
 import torch
 import argparse
 
@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(args.checkpoint, map_location=device)
-    model = BERTSummarizer(checkpoint["model_name"]).to(device)
+    model = loadModel(checkpoint["model_name"], checkpoint["model_family"]).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     document = args.document
@@ -30,13 +30,13 @@ if __name__ == "__main__":
     summary_sents = []
 
     if args.strategy_length != None:
-        summary_sents = model.summarize(document, "length", args.strategy_length)
+        summary_sents, _ = model.summarize(document, "length", args.strategy_length)
     elif args.strategy_count != None:
-        summary_sents = model.summarize(document, "count", args.strategy_count)
+        summary_sents, _ = model.summarize(document, "count", args.strategy_count)
     elif args.strategy_ratio != None:
-        summary_sents = model.summarize(document, "ratio", args.strategy_ratio)
+        summary_sents, _ = model.summarize(document, "ratio", args.strategy_ratio)
     elif args.strategy_threshold != None:
-        summary_sents = model.summarize(document, "threshold", args.strategy_threshold)
+        summary_sents, _ = model.summarize(document, "threshold", args.strategy_threshold)
 
     summary = "\n".join(summary_sents)
     print()

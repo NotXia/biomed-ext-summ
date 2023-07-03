@@ -7,6 +7,7 @@ from datasets import Dataset, DatasetDict, load_from_disk
 from transformers import BertTokenizer
 import itertools
 import random
+from data.BERTDataset import generateSegmentIds
 
 
 
@@ -87,18 +88,11 @@ def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     # reduced_labels = labels
 
     doc_ids = tokenizer.convert_tokens_to_ids(doc_tokens)
-
-    # Segments with alternating 0s and 1s
-    segments_ids = [0] * len(doc_ids)
-    curr_segment = 0
-    for i, token in enumerate(doc_ids):
-        segments_ids[i] = curr_segment
-        if token == tokenizer.vocab["[SEP]"]: curr_segment = 1 - curr_segment
-    
+    segment_ids = generateSegmentIds(doc_ids, tokenizer)
     # Position of [CLS] tokens
     cls_idxs = [i for i, token in enumerate(doc_ids) if token == tokenizer.vocab["[CLS]"]]
 
-    return doc_ids, segments_ids, cls_idxs, reduced_labels
+    return doc_ids, segment_ids, cls_idxs, reduced_labels
 
 
 
@@ -134,7 +128,7 @@ if __name__ == "__main__":
             assert len(data["__labels"]) == len(data["__bert_cls_idxs"])
             
         dataset_content = {
-            "ids": dataset["ids"],    
+            "id": dataset["id"],    
             "ref_summary": dataset["ref_summary"],    
             "labels": dataset["__labels"],
             "bert_doc_ids": dataset["__bert_doc_ids"],

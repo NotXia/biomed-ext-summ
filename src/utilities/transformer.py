@@ -38,3 +38,27 @@ class NoamScheduler():
 
         for param in self.optimizer.param_groups:
             param["lr"] = new_lr
+
+
+"""
+    Encoders to attend sentence level features.
+"""
+class TransformerInterEncoder(nn.Module):
+    def __init__(self, d_model, d_ff=2048, nheads=6, num_encoders=2, dropout=0.1, max_len=512):
+        super().__init__()
+        self.positional_enc = PositionalEncoding(d_model, dropout, max_len)
+        self.encoders = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=nheads, dim_feedforward=d_ff), 
+            num_layers=num_encoders
+        )
+        self.layer_norm = nn.LayerNorm(d_model)
+        self.linear = nn.Linear(d_model, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.positional_enc(x)
+        x = self.encoders(x)
+        x = self.layer_norm(x)
+        sentences_scores = self.sigmoid(self.linear(x))
+
+        return sentences_scores.squeeze(-1) 

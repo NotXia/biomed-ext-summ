@@ -1,24 +1,26 @@
-from models.bert_summ import BERTSummarizer
-from data.dataset_loader import load_dataset
-from transformers import BertTokenizer
+from models.loader import loadModel
+from data.loader import loadDataset
 import torch
 from tqdm import tqdm
 import numpy as np
 import argparse
 import os
 import random
-# from utilities.transformer import NoamScheduler
 from metrics.recall import recall
 from metrics.rouge import evalROUGE
 from metrics.logger import MetricsLogger
 
 
 
-def writeHistoryHeader(history_path):
+def writeHistoryHeader(history_path=None):
+    if history_path == None: return 
+
     with open(history_path, "w") as f:
         f.write("epoch;train_loss;train_recall;val_loss;val_recall;val_r1_p;val_r1_r;val_r1_f1;val_r2_p;val_r2_r;val_r2_f1;val_rl_p;val_rl_r;val_rl_f1\n")
 
-def writeHistoryEntry(history_path, epoch, train_metrics, val_metrics):
+def writeHistoryEntry(epoch, train_metrics, val_metrics, history_path=None):
+    if history_path is None: return 
+
     with open(history_path, "a") as f:
         train_avgs = train_metrics.averages()
         val_avgs = val_metrics.averages()
@@ -64,35 +66,47 @@ def perSentenceLoss(loss, batch_predictions, batch_labels, batch_num_sentences):
         device : Device
         epochs : int
             Number of epochs to train.
-        starting_epoch : int
-            Number from where the epoch count will start.
         history_path : str
             CSV file where the training history will be stored.
+        checkpoint : str
+            Path to the checkpoint to load
         checkpoints_path : str
             Directory where the checkpoints will be stored.
         checkpoints_frequency : int
             Number of epochs after which a checkpoint will be created.
         checkpoint_best : bool
             If True, a checkpoint will be created each time a model has a better validation recall.
-        model_name : str
-            Name of the pretrained model (e.g. bert-base-uncased)
 """
-def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, epochs, device, tokenizer,
-          history_path, checkpoints_path, checkpoints_frequency, checkpoint_best, model_name, starting_epoch=1):
-    def _createCheckpoint(path, epoch_num, model, model_name, optimizer, metrics):
+def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, device,
+          history_path, checkpoint, checkpoints_path, checkpoints_frequency, checkpoint_best):
+    def _createCheckpoint(path, epoch_num, model, optimizer, metrics):
         torch.save({
             "epoch": epoch_num,
             "model_state_dict": model.state_dict(),
-            "model_name": model_name,
+            "model_name": model.model_name,
+            "model_family": model.model_family,
             "optimizer_state_dict": optimizer.state_dict(),
             "metrics": metrics
         }, path)
 
-    epochs = epochs + starting_epoch - 1
+    model = model.to(device)
+    loss = loss.to(device)
+    starting_epoch = 1
     curr_best_val_recall = -1
     train_metrics = MetricsLogger()
     val_metrics = MetricsLogger()
 
+    if checkpoint is not None:
+        print(f"-- Loading checkpoint at {checkpoint} --")
+        checkpoint = torch.load(checkpoint, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        starting_epoch = checkpoint["epoch"] + 1
+
+    writeHistoryHeader(history_path)
+    if not os.path.exists(checkpoints_path): os.makedirs(checkpoints_path)
+
+    epochs = epochs + starting_epoch - 1
     for epoch_num in range(starting_epoch, epochs+1):
         train_metrics.reset()
         val_metrics.reset()
@@ -103,14 +117,13 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
             labels = labels.float().to(device)
 
             optimizer.zero_grad()
-            outputs = model.predict(documents, device)
+            outputs = model(documents)
             batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
             batch_loss.backward()
             optimizer.step()
 
             train_metrics.add("loss", batch_loss.item())
             train_metrics.add("recall", recall(labels, outputs))
-        # scheduler.step()
 
         # Validation
         model.eval()
@@ -118,12 +131,19 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
             for documents, labels in tqdm(val_dataloader, desc=f"Validation"):
                 labels = labels.float().to(device)
 
-                outputs = model.predict(documents, device)
+                outputs = model(documents)
                 batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
 
+                # Creates summaries for ROUGE
+                ext_summaries = []
+                for i in range(len(labels)): # For each element of batch
+                    ext_summary_size = len( (labels[i] == 1).nonzero(as_tuple=True)[0] )
+                    ext_sentences, _ = model.summarizeFromDataset(outputs[i], documents["ids"][i], ext_summary_size)
+                    ext_summaries.append( "\n".join(ext_sentences) )
+                    
                 val_metrics.add("loss", batch_loss.item())
                 val_metrics.add("recall", recall(labels, outputs))
-                val_metrics.add("rouge", evalROUGE(model, tokenizer, documents, labels, outputs))
+                val_metrics.add("rouge", evalROUGE(documents["ref_summary"], ext_summaries))
 
         print(f"Train: {train_metrics.format(['loss', 'recall'])}")
         print(f"Val: {val_metrics.format(['loss', 'recall', 'rouge'])}")
@@ -132,10 +152,10 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
         # Checkpoints
         is_best_model = (val_metrics.averages()["recall"] > curr_best_val_recall and checkpoint_best)
         is_final_epoch = (epoch_num == epochs)
-        if epoch_num % checkpoints_frequency == 0 or is_best_model or is_final_epoch:
-            checkpoint_path = os.path.join(checkpoints_path, f"cp_{model_name.replace('/', '_')}_ep{epoch_num}.tar")
+        if (epoch_num % checkpoints_frequency == 0) or is_best_model or is_final_epoch:
+            checkpoint_path = os.path.join(checkpoints_path, f"cp_{model.model_name.replace('/', '_')}_ep{epoch_num:03d}.tar")
             print(f"Saving checkpoint at {checkpoint_path}")
-            _createCheckpoint(checkpoint_path, epoch_num, model, model_name, optimizer, val_metrics.averages())
+            _createCheckpoint(checkpoint_path, epoch_num, model, optimizer, val_metrics.averages())
 
             if is_best_model:
                 curr_best_val_recall = val_metrics.averages()["recall"]
@@ -145,14 +165,16 @@ def train(model, loss, optimizer, scheduler, train_dataloader, val_dataloader, e
                         f"{val_metrics.format(['loss', 'recall', 'rouge'])}"
                     )
 
-        writeHistoryEntry(history_path, epoch_num, train_metrics, val_metrics)
+        writeHistoryEntry(epoch_num, train_metrics, val_metrics, history_path)
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Model training")
     parser.add_argument("--model", type=str, required=True, help="Model to use as starting point (e.g. bert-base-uncased)")
+    parser.add_argument("--model-family", type=str, choices=["bert"], required=True, help="Family of the model (e.g. bert)")
     parser.add_argument("--dataset", type=str, required=True, help="Path to a preprocesses dataset")
     parser.add_argument("--epochs", type=int, required=True, help="Number of epochs to train")
-    # parser.add_argument("--warmup", type=int, default=1, help="Number of warm-up steps")
     parser.add_argument("--batch-size", type=int, required=True)
     parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate")
     parser.add_argument("--beta1", type=float, default=0.9)
@@ -171,44 +193,25 @@ if __name__ == "__main__":
     if torch.cuda.is_available(): os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = BERTSummarizer(args.model).to(device)
-    tokenizer = BertTokenizer.from_pretrained(args.model)
-    datasets = load_dataset(args.dataset, tokenizer=tokenizer, splits=["train", "validation"])
+    model = loadModel(args.model, args.model_family)
+    datasets = loadDataset(args.dataset, model.model_family, model.tokenizer, splits=["train", "validation"])
     train_dataloader = torch.utils.data.DataLoader(datasets["train"], batch_size=args.batch_size)
     val_dataloader = torch.utils.data.DataLoader(datasets["validation"], batch_size=args.batch_size)
-    loss = torch.nn.BCELoss().to(device)
+    loss = torch.nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
-    # scheduler = NoamScheduler(optimizer, args.warmup, model.scheduler_d_model)
-    scheduler = None
-    starting_epoch = 1
 
-    if not os.path.exists(args.checkpoints_path):
-        os.makedirs(args.checkpoints_path)
-
-    if args.checkpoint is not None:
-        print(f"-- Loading checkpoint at {args.checkpoint} --")
-        checkpoint = torch.load(args.checkpoint, map_location=device)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        starting_epoch = checkpoint["epoch"] + 1
-        # scheduler.epoch = checkpoint["epoch"]
-
-    writeHistoryHeader(args.history_path)
 
     print("-- Starting training --")
     train(
         model = model,
-        model_name = args.model,
         loss = loss, 
         optimizer = optimizer, 
-        scheduler = scheduler,
         train_dataloader = train_dataloader, 
         val_dataloader = val_dataloader, 
-        tokenizer = tokenizer,
         epochs = args.epochs,
-        starting_epoch = starting_epoch,
         device = device,
         history_path = args.history_path,
+        checkpoint = args.checkpoint,
         checkpoints_path = args.checkpoints_path,
         checkpoints_frequency = args.checkpoints_freq,
         checkpoint_best = args.checkpoint_best

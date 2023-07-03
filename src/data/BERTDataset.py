@@ -1,14 +1,24 @@
-"""
-Dataset loading utilities
-"""
-
 import torch
-from datasets import load_from_disk
 from utilities.utilities import padToSize
 
 
+"""
+    Generates the segments ids for BERT
+"""
+def generateSegmentIds(doc_ids, tokenizer):
+    # Alternating 0s and 1s
+    segments_ids = [0] * len(doc_ids)
+    curr_segment = 0
 
-class SummDatasetBERT(torch.utils.data.Dataset):
+    for i, token in enumerate(doc_ids):
+        segments_ids[i] = curr_segment
+        if token == tokenizer.vocab["[SEP]"]: 
+            curr_segment = 1 - curr_segment
+
+    return segments_ids
+
+
+class BERTDataset(torch.utils.data.Dataset):
     def __init__(self, ext_dataset, tokenizer, input_size=512):
         self.labels = []
         self.documents = []
@@ -35,34 +45,3 @@ class SummDatasetBERT(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         return self.documents[idx], self.labels[idx]
-
-
-"""
-    Loads a dataset for a specific model.
-
-    Parameters
-    ----------
-        path : str
-            Path to the preprocessed dataset.
-
-        splits : str[]
-            Splits to parse from the source dataset. If not specified, all splits will be processed.
-
-        tokenizer : Tokenizer
-            Tokenizer of the model 
-
-    Returns
-    -------
-        datasets : dict<str, Dataset>
-            Dictionary mapping the split to the Dataset object.
-
-"""
-def load_dataset(path, splits=[], tokenizer=None):
-    dataset = load_from_disk(path)
-    out = {}
-
-    if tokenizer == None: raise ValueError("Missing BERT tokenizer")
-    for split_name in (splits if len(splits) > 0 else dataset):
-        out[split_name] = SummDatasetBERT(dataset[split_name], tokenizer)
-
-    return out
