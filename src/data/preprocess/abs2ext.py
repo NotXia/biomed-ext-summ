@@ -90,8 +90,8 @@ def _getDatasetAndUtilities(name, dataset_dir):
         if dataset_dir == None: dataset = load_dataset("cnn_dailymail", "3.0.0")
         dataExtractor = lambda dataset_row: (dataset_row["article"], dataset_row["highlights"])
     
-    elif name == "ms2":
-        if dataset_dir == None: dataset = load_dataset("allenai/mslr2022", "ms2")
+    elif name == "ms2" or name == "cochrane":
+        if dataset_dir == None: dataset = load_dataset("allenai/mslr2022", name)
         def extractor(dataset_row):
             for i in range(len(dataset_row["abstract"])):
                 dataset_row["abstract"][i] = dataset_row["abstract"][i].strip()
@@ -108,12 +108,12 @@ def _getDatasetAndUtilities(name, dataset_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Dataset preprocessing - Abstractive to extractive dataset conversion")
-    parser.add_argument("--dataset", type=str, choices=["cnn_dailymail", "ms2"], required=True)
+    parser.add_argument("--dataset", type=str, choices=["cnn_dailymail", "ms2", "cochrane"], required=True)
     parser.add_argument("--dataset-dir", type=str, help="Directory of the dataset, if not specified, it will be downloaded")
     parser.add_argument("--head", action="store_true", help="Show some rows of the parsed dataset")
     parser.add_argument("--output", type=str, help="Directory where the dataset will be exported to")
     parser.add_argument("--proc", type=int, default=1, help="Number of processes to create")
-    parser.add_argument("--selection-size", type=int, default=3, help="Number of sentences to select")
+    parser.add_argument("--selection-size", type=int, default=3, help="Number of sentences to select. The maximum between this value and the number of sentences in the abstractive summary will be considered.")
     args = parser.parse_args()
     
 
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         return Dataset.from_dict(dataset_content)
     
     parsed_dataset = {}
-    if args.dataset in ["cnn_dailymail", "ms2"]:
+    if args.dataset in ["cnn_dailymail", "ms2", "cochrane"]:
         parsed_dataset["train"] = _filterDataset(dataset["train"])
         parsed_dataset["test"] = _filterDataset(dataset["test"])
         parsed_dataset["validation"] = _filterDataset(dataset["validation"])
