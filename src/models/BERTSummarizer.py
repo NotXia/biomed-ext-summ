@@ -55,7 +55,23 @@ class BERTSummarizer(BaseSummarizer):
             while len(doc_tokens) > self.input_size:
                 # Splits at the [SEP] token
                 sep_idx = self.input_size - 1
-                while doc_tokens[sep_idx] != "[SEP]": sep_idx -= 1
+                while doc_tokens[sep_idx] != "[SEP]":
+                    if sep_idx <= 0: # The sentence is too long, truncate it
+                        # Finds the next [CLS] (if exists)
+                        next_cls_idx = None
+                        i = self.input_size
+                        for i in range(self.input_size, len(doc_tokens)):
+                            if doc_tokens[i] == "[CLS]":
+                                next_cls_idx = i
+                                break
+
+                        if next_cls_idx != None:
+                            doc_tokens = doc_tokens[:self.input_size-1] + ["[SEP]"] + doc_tokens[next_cls_idx:]
+                        else:
+                            doc_tokens = doc_tokens[:self.input_size-1] + ["[SEP]"]
+                        sep_idx = self.input_size - 1
+                        break
+                    sep_idx -= 1
                 splits.append(doc_tokens[:sep_idx+1])
                 doc_tokens = doc_tokens[sep_idx+1:]
             if len(doc_tokens) != 0: splits.append(doc_tokens) # Remaining part of the document
