@@ -17,7 +17,7 @@ def _selectStrategyLength(sentences, predictions, max_length):
 
 
 def _selectStrategyCount(sentences, predictions, num_sents):
-    return sorted(torch.topk(predictions, num_sents).indices)
+    return sorted(torch.topk(predictions, min(len(predictions), num_sents)).indices)
 
 
 def _selectStrategyRatio(sentences, predictions, ratio):
