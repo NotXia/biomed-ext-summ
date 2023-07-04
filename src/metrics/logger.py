@@ -65,8 +65,8 @@ class MetricsLogger():
         if "recall" in types:
             out += f"Recall {avgs['recall']:.5f} | "
         if "rouge" in types:
-            out += f"ROUGE-1 r: {avgs['rouge1']['recall']:.5f} -- p: {avgs['rouge1']['precision']:.5f} -- f1: {avgs['rouge1']['fmeasure']:.5f} | "
-            out += f"ROUGE-2 r: {avgs['rouge2']['recall']:.5f} -- p: {avgs['rouge2']['precision']:.5f} -- f1: {avgs['rouge2']['fmeasure']:.5f} | "
-            out += f"ROUGE-L r: {avgs['rougeL']['recall']:.5f} -- p: {avgs['rougeL']['precision']:.5f} -- f1: {avgs['rougeL']['fmeasure']:.5f} | "
+            out += f"ROUGE-1 r: {avgs['rouge1']['recall']*100:.2f} -- p: {avgs['rouge1']['precision']*100:.2f} -- f1: {avgs['rouge1']['fmeasure']*100:.2f} | "
+            out += f"ROUGE-2 r: {avgs['rouge2']['recall']*100:.2f} -- p: {avgs['rouge2']['precision']*100:.2f} -- f1: {avgs['rouge2']['fmeasure']*100:.2f} | "
+            out += f"ROUGE-L r: {avgs['rougeL']['recall']*100:.2f} -- p: {avgs['rougeL']['precision']*100:.2f} -- f1: {avgs['rougeL']['fmeasure']*100:.2f} | "
 
         return out
