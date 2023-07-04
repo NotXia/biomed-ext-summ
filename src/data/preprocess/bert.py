@@ -95,20 +95,9 @@ def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     return doc_ids, segment_ids, cls_idxs, reduced_labels
 
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Dataset preprocessing - Parse for BERT")
-    parser.add_argument("--dataset-dir", type=str, help="Directory of the dataset (output of abs2ext.py)")
-    parser.add_argument("--output", type=str, help="Directory where the dataset will be exported to")
-    parser.add_argument("--proc", type=int, default=1, help="Number of processes to create")
-    parser.add_argument("--model", type=str, default="bert-base-uncased", help="Model the dataset targets")
-    args = parser.parse_args()
-    
-    random.seed(42)
-
-
-    tokenizer = BertTokenizer.from_pretrained(args.model)
-    dataset = load_from_disk(args.dataset_dir)
+def preprocessForBERT(model_name, dataset_dir, num_proc):
+    tokenizer = BertTokenizer.from_pretrained(model_name)
+    dataset = load_from_disk(dataset_dir)
 
     # Dataset parsing
     def _parseDataset(data):
@@ -119,7 +108,7 @@ if __name__ == "__main__":
         out["__bert_cls_idxs"] = cls_idxs
         out["__labels"] = labels
         return out
-    dataset = dataset.map(_parseDataset, num_proc=args.proc)
+    dataset = dataset.map(_parseDataset, num_proc=num_proc)
 
 
     # Splitting
@@ -144,7 +133,4 @@ if __name__ == "__main__":
     }
     parsed_dataset = DatasetDict(parsed_dataset)
 
-
-    # Save dataset locally
-    if args.output != None:
-        parsed_dataset.save_to_disk(args.output)
+    return parsed_dataset
