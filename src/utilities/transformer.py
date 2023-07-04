@@ -44,7 +44,7 @@ class NoamScheduler():
     Encoders to attend sentence level features.
 """
 class TransformerInterEncoder(nn.Module):
-    def __init__(self, d_model, d_ff=2048, nheads=6, num_encoders=2, dropout=0.1, max_len=512):
+    def __init__(self, d_model, d_ff=2048, nheads=8, num_encoders=2, dropout=0.1, max_len=512):
         super().__init__()
         self.positional_enc = PositionalEncoding(d_model, dropout, max_len)
         self.encoders = nn.TransformerEncoder(
