@@ -76,9 +76,11 @@ def perSentenceLoss(loss, batch_predictions, batch_labels, batch_num_sentences):
             Number of epochs after which a checkpoint will be created.
         checkpoint_best : bool
             If True, a checkpoint will be created each time a model has a better validation recall.
+        accumulation_steps : int
+            Gradient accumulation steps.
 """
 def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, device,
-          history_path, checkpoint, checkpoints_path, checkpoints_frequency, checkpoint_best):
+          history_path, checkpoint, checkpoints_path, checkpoints_frequency, checkpoint_best, accumulation_steps=1):
     def _createCheckpoint(path, epoch_num, model, optimizer, metrics):
         torch.save({
             "epoch": epoch_num,
@@ -113,14 +115,19 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
 
         # Training
         model.train()
-        for documents, labels in tqdm(train_dataloader, desc=f"Epoch {epoch_num}/{epochs}"):
+        optimizer.zero_grad()
+        for i, (documents, labels) in enumerate(tqdm(train_dataloader, desc=f"Epoch {epoch_num}/{epochs}")):
             labels = labels.float().to(device)
 
             optimizer.zero_grad()
             outputs = model(documents)
             batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
-            batch_loss.backward()
-            optimizer.step()
+            acc_loss = batch_loss / accumulation_steps
+            acc_loss.backward()
+
+            if ((i+1) % accumulation_steps == 0) or ((i+1) == len(train_dataloader)):
+                optimizer.step()
+                optimizer.zero_grad()
 
             train_metrics.add("loss", batch_loss.item())
             train_metrics.add("recall", recall(labels, outputs))
@@ -176,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, required=True, help="Path to a preprocesses dataset")
     parser.add_argument("--epochs", type=int, required=True, help="Number of epochs to train")
     parser.add_argument("--batch-size", type=int, required=True)
+    parser.add_argument("--accum-steps", type=int, default=1, help="Gradient accumulation steps")
     parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate")
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.999)
@@ -208,6 +216,7 @@ if __name__ == "__main__":
         optimizer = optimizer, 
         train_dataloader = train_dataloader, 
         val_dataloader = val_dataloader, 
+        accumulation_steps = args.accum_steps,
         epochs = args.epochs,
         device = device,
         history_path = args.history_path,
