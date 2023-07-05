@@ -2,9 +2,7 @@
 Preprocessing for BERT
 """
 
-import argparse
 from datasets import Dataset, DatasetDict, load_from_disk
-from transformers import BertTokenizer
 import itertools
 import random
 from data.BERTDataset import generateSegmentIds
@@ -95,8 +93,7 @@ def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     return doc_ids, segment_ids, cls_idxs, reduced_labels
 
 
-def preprocessForBERT(model_name, dataset_dir, num_proc):
-    tokenizer = BertTokenizer.from_pretrained(model_name)
+def preprocessForBERT(tokenizer, dataset_dir, num_proc):
     dataset = load_from_disk(dataset_dir)
 
     # Dataset parsing

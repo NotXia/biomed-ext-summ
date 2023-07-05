@@ -1,25 +1,18 @@
 import torch
-import torch.nn as nn
-from transformers import BertModel
-from transformers import BertTokenizer
 from models.BaseSummarizer import BaseSummarizer
 from utilities.transformer import TransformerInterEncoder
 from utilities.utilities import padToSize
-from utilities.summary import select
 import itertools
 from data.BERTDataset import generateSegmentIds
 
 
 
 class BERTSummarizer(BaseSummarizer):
-    def __init__(self, bert_model="bert-base-uncased", input_size=512):
-        super().__init__(bert_model, "bert", input_size)
-        self.bert = BertModel.from_pretrained(bert_model)
+    def __init__(self, bert_model, bert_tokenizer, input_size=512):
+        super().__init__(bert_model.name_or_path, input_size)
+        self.bert = bert_model
+        self.tokenizer = bert_tokenizer
         self.encoder = TransformerInterEncoder(self.bert.config.hidden_size)
-
-
-    def _createTokenizer(self):
-        return BertTokenizer.from_pretrained(self.model_name)
 
 
     def forward(self, batch):

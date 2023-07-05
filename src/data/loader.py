@@ -3,6 +3,7 @@ Dataset loading utilities
 """
 
 from datasets import load_from_disk
+from transformers import BertTokenizerFast, BertTokenizer
 from data.BERTDataset import BERTDataset
 
 
@@ -14,9 +15,6 @@ from data.BERTDataset import BERTDataset
     ----------
         path : str
             Path to the preprocessed dataset.
-
-        model_family : str
-            Type of model (e.g. bert).
 
         tokenizer : Tokenizer
             Tokenizer of the model 
@@ -30,14 +28,14 @@ from data.BERTDataset import BERTDataset
             Dictionary mapping the split to the Dataset object.
 
 """
-def loadDataset(path, model_family, tokenizer, splits=[]):
+def loadDataset(path, tokenizer, splits=[]):
     dataset = load_from_disk(path)
     out = {}
 
-    if model_family == "bert":
+    if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast):
         for split_name in (splits if len(splits) > 0 else dataset):
             out[split_name] = BERTDataset(dataset[split_name], tokenizer)
     else:
-        raise NotImplementedError(f"{model_family} not available")
+        raise NotImplementedError(f"{tokenizer.name_or_path} not available")
 
     return out

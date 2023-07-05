@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(args.checkpoint, map_location=device)
-    model = loadModel(checkpoint["model_name"], checkpoint["model_family"]).to(device)
+    model = loadModel(checkpoint["model_name"]).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     document = args.document

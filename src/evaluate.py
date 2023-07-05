@@ -79,7 +79,7 @@ if __name__ == "__main__":
     model = None
     if args.checkpoint is not None:
         checkpoint = torch.load(args.checkpoint, map_location=device)
-        model = loadModel(checkpoint["model_name"], checkpoint["model_family"]).to(device)
+        model = loadModel(checkpoint["model_name"]).to(device)
         model.load_state_dict(checkpoint["model_state_dict"])
     elif args.oracle:
         model = "oracle"

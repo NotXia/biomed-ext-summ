@@ -1,3 +1,4 @@
+from transformers import AutoModel, AutoTokenizer, BertModel
 from models.BERTSummarizer import BERTSummarizer
 
 
@@ -10,17 +11,17 @@ from models.BERTSummarizer import BERTSummarizer
         model_name : str
             Base pretrained model (e.g. bert-base-uncased).
 
-        model_family : str
-            Type of model (e.g. bert).
-
     Returns
     -------
         datasets : dict<str, Dataset>
             Dictionary mapping the split to the Dataset object.
 
 """
-def loadModel(model_name, model_family):
-    if model_family == "bert":
-        return BERTSummarizer(model_name)
+def loadModel(model_name):
+    model = AutoModel.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+
+    if isinstance(model, BertModel):
+        return BERTSummarizer(model, tokenizer)
     else:
-        raise NotImplementedError(f"{model_family} not available")
+        raise NotImplementedError(f"{model_name} not available")

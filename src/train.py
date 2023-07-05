@@ -86,7 +86,6 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
             "epoch": epoch_num,
             "model_state_dict": model.state_dict(),
             "model_name": model.model_name,
-            "model_family": model.model_family,
             "optimizer_state_dict": optimizer.state_dict(),
             "metrics": metrics
         }, path)
@@ -179,7 +178,6 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Model training")
     parser.add_argument("--model", type=str, required=True, help="Model to use as starting point (e.g. bert-base-uncased)")
-    parser.add_argument("--model-family", type=str, choices=["bert"], required=True, help="Family of the model (e.g. bert)")
     parser.add_argument("--dataset", type=str, required=True, help="Path to a preprocesses dataset")
     parser.add_argument("--epochs", type=int, required=True, help="Number of epochs to train")
     parser.add_argument("--batch-size", type=int, required=True)
@@ -201,8 +199,8 @@ if __name__ == "__main__":
     if torch.cuda.is_available(): os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = loadModel(args.model, args.model_family)
-    datasets = loadDataset(args.dataset, model.model_family, model.tokenizer, splits=["train", "validation"])
+    model = loadModel(args.model)
+    datasets = loadDataset(args.dataset, model.tokenizer, splits=["train", "validation"])
     train_dataloader = torch.utils.data.DataLoader(datasets["train"], batch_size=args.batch_size)
     val_dataloader = torch.utils.data.DataLoader(datasets["validation"], batch_size=args.batch_size)
     loss = torch.nn.BCELoss()
