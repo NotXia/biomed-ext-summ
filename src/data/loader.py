@@ -3,8 +3,9 @@ Dataset loading utilities
 """
 
 from datasets import load_from_disk
-from transformers import BertTokenizerFast, BertTokenizer
+from transformers import BertTokenizerFast, BertTokenizer, RobertaTokenizer, RobertaTokenizerFast
 from data.BERTDataset import BERTDataset
+from data.RoBERTaDataset import RoBERTaDataset
 
 
 
@@ -32,10 +33,15 @@ def loadDataset(path, tokenizer, splits=[]):
     dataset = load_from_disk(path)
     out = {}
 
+    ModelDataset = None
+
     if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast):
-        for split_name in (splits if len(splits) > 0 else dataset):
-            out[split_name] = BERTDataset(dataset[split_name], tokenizer)
+        ModelDataset = BERTDataset
+    elif isinstance(tokenizer, RobertaTokenizer) or isinstance(tokenizer, RobertaTokenizerFast):
+        ModelDataset = RoBERTaDataset
     else:
         raise NotImplementedError(f"{tokenizer.name_or_path} not available")
 
+    for split_name in (splits if len(splits) > 0 else dataset):
+        out[split_name] = ModelDataset(dataset[split_name], tokenizer)
     return out
