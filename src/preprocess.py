@@ -5,8 +5,9 @@ Based on the paper: Text Summarization with Pretrained Encoders.
 import argparse
 import random
 from datasets import DatasetDict, load_from_disk
-from transformers import AutoTokenizer, BertTokenizer, BertTokenizerFast
-from data.preprocess.bert import preprocessForBERTUtilities
+from transformers import AutoTokenizer, BertTokenizer, BertTokenizerFast, RobertaTokenizer, RobertaTokenizerFast
+from data.preprocess.bert import preprocessUtilitiesBERT
+from data.preprocess.roberta import preprocessUtilitiesRoBERTa
 
 
 
@@ -26,7 +27,9 @@ if __name__ == "__main__":
     parsed_dataset = None
 
     if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast):
-        datasetMapFn, datasetFilterFn = preprocessForBERTUtilities(tokenizer)
+        datasetMapFn, datasetFilterFn = preprocessUtilitiesBERT(tokenizer)
+    elif isinstance(tokenizer, RobertaTokenizer) or isinstance(tokenizer, RobertaTokenizerFast):
+        datasetMapFn, datasetFilterFn = preprocessUtilitiesRoBERTa(tokenizer)
     else:
         raise NotImplementedError
 
@@ -38,6 +41,6 @@ if __name__ == "__main__":
         "validation": datasetFilterFn(dataset["validation"])
     }
     parsed_dataset = DatasetDict(parsed_dataset)
-
+    
     if args.output != None:
         parsed_dataset.save_to_disk(args.output)
