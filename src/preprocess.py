@@ -1,10 +1,17 @@
+"""
+Parse a dataset for a specific model
+Based on the paper: Text Summarization with Pretrained Encoders.
+"""
 import argparse
 import random
+from datasets import DatasetDict, load_from_disk
 from transformers import AutoTokenizer, BertTokenizer, BertTokenizerFast
-from data.preprocess.bert import preprocessForBERT
+from data.preprocess.bert import preprocessForBERTUtilities
+
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Dataset preprocessing - Parse for BERT")
+    parser = argparse.ArgumentParser(prog="Dataset - model-specific preprocessing")
     parser.add_argument("--dataset-dir", type=str, required=True, help="Directory of the dataset (output of abs2ext.py)")
     parser.add_argument("--output", type=str, required=True, help="Directory where the dataset will be exported to")
     parser.add_argument("--proc", type=int, default=1, help="Number of processes to create")
@@ -13,15 +20,24 @@ if __name__ == "__main__":
     
     random.seed(42)
 
+    dataset = load_from_disk(args.dataset_dir)
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
+    datasetMapFn, datasetFilterFn = None, None
     parsed_dataset = None
 
     if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast):
-        parsed_dataset = preprocessForBERT(tokenizer, args.dataset_dir, args.proc)
+        datasetMapFn, datasetFilterFn = preprocessForBERTUtilities(tokenizer)
     else:
         raise NotImplementedError
 
 
-    # Save dataset locally
+    dataset = dataset.map(datasetMapFn, num_proc=args.proc)
+    parsed_dataset = {
+        "train": datasetFilterFn(dataset["train"]),
+        "test": datasetFilterFn(dataset["test"]),
+        "validation": datasetFilterFn(dataset["validation"])
+    }
+    parsed_dataset = DatasetDict(parsed_dataset)
+
     if args.output != None:
         parsed_dataset.save_to_disk(args.output)

@@ -2,51 +2,15 @@
 Preprocessing for BERT
 """
 
-from datasets import Dataset, DatasetDict, load_from_disk
+from datasets import Dataset
+from utilities.preprocess import reduceTokens
 import itertools
-import random
 from data.BERTDataset import generateSegmentIds
 
 
 
 """
-    Reduces the tokens of a document by removing sentences that are not part of the summary.
-
-    Parameters
-    ----------
-        sentences : str[]
-            Sentences of the document.
-
-        labels : bool[]
-            Label for each sentence of the document.
-
-        max_tokens : int
-            Maximum number of tokens the document should have.
-
-    Returns
-    -------
-        reduced_sentences : str[]
-        reduced_labels : bool[]
-"""
-def reduceTokens(sentences, labels, max_tokens):
-    total_tokens = sum([ len(sent) for sent in sentences ])
-
-    while total_tokens > max_tokens:
-        # Randomly selects a sentence that is not part of the summary
-        removable_sentences = [i for i, selected in enumerate(labels) if not selected]
-        if len(removable_sentences) == 0: break
-        to_remove_sentence_idx = random.choice(removable_sentences)
-        
-        total_tokens -= len(sentences[to_remove_sentence_idx])
-        del sentences[to_remove_sentence_idx]
-        del labels[to_remove_sentence_idx]
-
-    return sentences, labels
-
-
-"""
     Parses the summary for BERT.
-    Based on the paper: Text Summarization with Pretrained Encoders.
 
     Parameters
     ----------
@@ -69,47 +33,44 @@ def reduceTokens(sentences, labels, max_tokens):
         labels : bool[]
             Label for each sentence.
 """
-def parseForBERT(sentences, labels, tokenizer, max_tokens=512):
+def _parseForBERT(sentences, labels, tokenizer, max_tokens=512):
     # Each sentence has its own [CLS] (e.g. [CLS] sent1 [SEP] [CLS] sent2 [SEP] [CLS] sent3 [SEP])
-    doc_tokens = ["[CLS]"] + tokenizer.tokenize( " [SEP] [CLS] ".join(sentences) ) + ["[SEP]"]
-    
-    # Reduces the number of tokens of the document
-    tokenized_sentences = [["[CLS]"] + list(y) for x, y in itertools.groupby(doc_tokens, lambda t: t == "[CLS]") if not x]
-    reduced_sentences, reduced_labels = reduceTokens(tokenized_sentences, labels, max_tokens)
-    doc_tokens = list(itertools.chain.from_iterable(reduced_sentences))
-    if len(doc_tokens) > max_tokens:  # In case the document can't be reduced further
-        doc_tokens = doc_tokens[:max_tokens-1] + ["[SEP]"]
-        reduced_labels = reduced_labels[:doc_tokens.count("[CLS]")]
+    tokenized_sentences = [[tokenizer.cls_token] + tokenizer.tokenize(sent) + [tokenizer.sep_token] for sent in sentences]
 
-    # doc_tokens = tokenizer.tokenize( " [SEP] [CLS] ".join(sentences) )
-    # doc_tokens = ["[CLS]"] + doc_tokens[:max_tokens-2] + ["[SEP]"]
-    # reduced_labels = labels
+    # Reduces the number of tokens in the document
+    reduced_sentences, reduced_labels = reduceTokens(tokenized_sentences, labels, max_tokens, tokenizer)
+    doc_tokens = list(itertools.chain.from_iterable(reduced_sentences))
 
     doc_ids = tokenizer.convert_tokens_to_ids(doc_tokens)
     segment_ids = generateSegmentIds(doc_ids, tokenizer)
-    # Position of [CLS] tokens
     cls_idxs = [i for i, token in enumerate(doc_ids) if token == tokenizer.vocab["[CLS]"]]
 
     return doc_ids, segment_ids, cls_idxs, reduced_labels
 
 
-def preprocessForBERT(tokenizer, dataset_dir, num_proc):
-    dataset = load_from_disk(dataset_dir)
 
-    # Dataset parsing
-    def _parseDataset(data):
+"""
+    Return the utilities to parse BERT
+
+    Returns
+    -------
+        parseDataset : (dataset-row) -> dataset-row
+            Function to use with datasets `map`
+
+        filterDataset : (dataset) -> dataset
+            Function to remove unnecessary columns from the dataset
+"""
+def preprocessUtilitiesBERT(tokenizer):
+    def parseDataset(data):
         out = {}
-        doc_ids, segments_ids, cls_idxs, labels = parseForBERT(data["sentences"], data["labels"], tokenizer)
+        doc_ids, segments_ids, cls_idxs, labels = _parseForBERT(data["sentences"], data["labels"], tokenizer)
         out["__bert_doc_ids"] = doc_ids
         out["__bert_segments_ids"] = segments_ids
         out["__bert_cls_idxs"] = cls_idxs
         out["__labels"] = labels
         return out
-    dataset = dataset.map(_parseDataset, num_proc=num_proc)
 
-
-    # Splitting
-    def _filterDataset(dataset):
+    def filterDataset(dataset):
         for data in dataset:
             assert len(data["__labels"]) == len(data["__bert_cls_idxs"])
             
@@ -122,12 +83,5 @@ def preprocessForBERT(tokenizer, dataset_dir, num_proc):
             "bert_cls_idxs": dataset["__bert_cls_idxs"]
         }
         return Dataset.from_dict(dataset_content)
-    
-    parsed_dataset = {
-        "train": _filterDataset(dataset["train"]),
-        "test": _filterDataset(dataset["test"]),
-        "validation": _filterDataset(dataset["validation"])
-    }
-    parsed_dataset = DatasetDict(parsed_dataset)
 
-    return parsed_dataset
+    return parseDataset, filterDataset
