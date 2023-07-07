@@ -1,10 +1,12 @@
-import torch.nn as nn
+import torch
 from utilities.summary import select
 import spacy
+import itertools
+from utilities.summary import splitDocument
 
 
 
-class BaseSummarizer(nn.Module):
+class BaseSummarizer(torch.nn.Module):
     def __init__(self, model_name, input_size):
         super().__init__()
         self._doc2sentences = None
@@ -13,6 +15,24 @@ class BaseSummarizer(nn.Module):
 
 
     def forward(self, batch):
+        raise NotImplementedError
+
+
+    """ 
+        Makes a prediction on a tokenized document.
+        It is assumed that the document is within the maximum input size.
+
+        Parameters
+        ----------
+            chunk_tokens : str[]
+                Tokens of the document.
+
+        Returns
+        -------
+            predictions : Tensor<float>
+                Score for each sentence.
+    """
+    def predictChunk(self, chunk_tokens):
         raise NotImplementedError
 
 
@@ -40,9 +60,12 @@ class BaseSummarizer(nn.Module):
                 Indexes of the selected sentences.
     """
     def summarizeFromDataset(self, predictions, doc_ids, summary_size):
-        raise NotImplementedError
+        doc_ids = [id for id in doc_ids if id != self.tokenizer.pad_token_id]
+        doc_sentences = [self.tokenizer.decode(list(ids)[:-1]) 
+                            for x, ids in itertools.groupby(doc_ids, lambda id: id == self.tokenizer.cls_token_id) if not x]
+        return self.summarizeSentences(doc_sentences, "count", summary_size, predictions=predictions)
     
-    
+
     """
         Make a prediction on a list of sentences.
 
@@ -57,7 +80,18 @@ class BaseSummarizer(nn.Module):
                 Score for each sentence.
     """
     def predict(self, sentences):
-        raise NotImplementedError
+        doc_tokens = self.tokenizer.tokenize( f"{self.tokenizer.sep_token}{self.tokenizer.cls_token}".join(sentences) )
+        doc_tokens = [self.tokenizer.cls_token] + doc_tokens + [self.tokenizer.sep_token]
+        # If the document is too long, it is split and processed separately. 
+        # The resulting predictions are then concatenated.
+        doc_chunks = splitDocument(doc_tokens, self.tokenizer.cls_token, self.tokenizer.sep_token, self.input_size)
+        predictions = torch.as_tensor([]).to(self.bert.device)
+
+        for chunk in doc_chunks:
+            chunk_preds = self.predictChunk(chunk)
+            predictions = torch.cat((predictions, chunk_preds))
+
+        return predictions
 
 
     """

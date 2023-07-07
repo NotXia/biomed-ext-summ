@@ -44,3 +44,63 @@ def select(sentences, predictions, strategy, strategy_args):
         raise NotImplementedError(f"Unknown strategy {strategy}")
     
     return [sentences[i] for i in selected_sents], selected_sents
+
+
+
+"""
+    Splits a document in chunks of maximum a given size.
+
+    Parameters
+    ----------
+        doc_tokens : str[]
+            List of the tokens of the document.
+
+        bos_token : str
+            Begin of sentence token.
+
+        eos_token : str
+            End of sentence token.
+
+        max_size : int
+            Maximum size of a chunk.
+    Returns
+    -------
+        chunks : str[][]
+            Splitted document.
+"""
+def splitDocument(doc_tokens, bos_token, eos_token, max_size):
+    def _findNextBOSFrom(start_idx):
+        for i in range(start_idx, len(doc_tokens)):
+            if doc_tokens[i] == bos_token:
+                return i
+        return -1
+    
+    def _findPreviousEOSFrom(start_idx):
+        for i in range(start_idx, -1, -1):
+            if doc_tokens[i] == eos_token:
+                return i
+        return -1
+    
+    chunks = []
+    
+    while len(doc_tokens) > max_size:
+        # Splits at the eos token
+        eos_idx = _findPreviousEOSFrom(max_size - 1)
+
+        if eos_idx == -1: 
+            # The sentence is too long.
+            # Find the next bos in front of the current sentence (if exists) and truncate the current sentence.
+            next_bos_idx = _findNextBOSFrom(max_size)
+            if next_bos_idx != -1:
+                doc_tokens = doc_tokens[:max_size-1] + [eos_token] + doc_tokens[next_bos_idx:]
+            else:
+                doc_tokens = doc_tokens[:max_size-1] + [eos_token]
+            eos_idx = max_size - 1
+            break
+
+        chunks.append(doc_tokens[:eos_idx+1])
+        doc_tokens = doc_tokens[eos_idx+1:]
+
+    if len(doc_tokens) > 0: chunks.append(doc_tokens) # Remaining part of the document
+    
+    return chunks
