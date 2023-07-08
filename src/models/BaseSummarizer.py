@@ -12,6 +12,7 @@ class BaseSummarizer(torch.nn.Module):
         self._doc2sentences = None
         self.model_name = model_name
         self.input_size = input_size
+        self.tokenizer = None
 
 
     def forward(self, batch):
@@ -85,7 +86,7 @@ class BaseSummarizer(torch.nn.Module):
         # If the document is too long, it is split and processed separately. 
         # The resulting predictions are then concatenated.
         doc_chunks = splitDocument(doc_tokens, self.tokenizer.cls_token, self.tokenizer.sep_token, self.input_size)
-        predictions = torch.as_tensor([]).to(self.bert.device)
+        predictions = torch.as_tensor([]).to(next(self.parameters()).device)
 
         for chunk in doc_chunks:
             chunk_preds = self.predictChunk(chunk)
