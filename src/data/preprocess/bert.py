@@ -68,12 +68,10 @@ def preprocessUtilitiesBERT(tokenizer):
         out["__bert_segments_ids"] = segments_ids
         out["__bert_cls_idxs"] = cls_idxs
         out["__labels"] = labels
+        assert len(out["__labels"]) == len(out["__bert_cls_idxs"])
         return out
 
     def filterDataset(dataset):
-        for data in dataset:
-            assert len(data["__labels"]) == len(data["__bert_cls_idxs"])
-            
         dataset_content = {
             "id": dataset["id"],    
             "ref_summary": dataset["ref_summary"],    
