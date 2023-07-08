@@ -46,6 +46,11 @@ def reduceTokens(tokenized_sentences, labels, max_tokens, tokenizer):
 
     # Last sentence have to be truncated
     if total_tokens > max_tokens:
-        tokenized_sentences[-1] = tokenized_sentences[-1][:total_tokens-max_tokens-2] + [tokenizer.sep_token]
+        tokenized_sentences[-1] = tokenized_sentences[-1][:len(tokenized_sentences[-1])-total_tokens-max_tokens-2] + [tokenizer.sep_token]
+        # Truncated sentence is empty
+        if len(tokenized_sentences[-1]) == 1 or len(tokenized_sentences[-1]) == 2:
+            del tokenized_sentences[-1]
+            del labels[-1]
 
+    assert sum([ len(sent) for sent in tokenized_sentences ]) <= max_tokens
     return tokenized_sentences, labels
