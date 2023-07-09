@@ -9,6 +9,7 @@ import random
 from metrics.recall import recall
 from metrics.rouge import evalROUGE
 from metrics.logger import MetricsLogger
+from models.LongformerSummarizer import LongformerSummarizer
 
 
 
@@ -118,7 +119,6 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
         for i, (documents, labels) in enumerate(tqdm(train_dataloader, desc=f"Epoch {epoch_num}/{epochs}")):
             labels = labels.float().to(device)
 
-            optimizer.zero_grad()
             outputs = model(documents)
             batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
             acc_loss = batch_loss / accumulation_steps
@@ -206,6 +206,8 @@ if __name__ == "__main__":
     loss = torch.nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
 
+    if isinstance(model, LongformerSummarizer):
+        torch.use_deterministic_algorithms(mode=False)
 
     print("-- Starting training --")
     train(
