@@ -22,15 +22,17 @@ class BERTSummarizer(BaseSummarizer):
 
         tokens_out, _ = self.bert(input_ids=document_ids, token_type_ids=segments_ids, attention_mask=bert_mask, return_dict=False)
         out = []
+        logits_out = []
 
         for i in range(len(tokens_out)): # Batch handling
             clss_out = tokens_out[i][clss_mask[i], :]
-            sentences_scores = self.encoder(clss_out)
+            sentences_scores, logits = self.encoder(clss_out)
             padding = torch.zeros(self.input_size - sentences_scores.shape[0]).to(sentences_scores.device)
             
             out.append( torch.cat((sentences_scores, padding)) )
+            logits_out.append( torch.cat((logits, padding)) )
 
-        return torch.stack(out)
+        return torch.stack(out), torch.stack(logits_out)
     
 
     def predictChunk(self, chunk_tokens):

@@ -81,7 +81,7 @@ def perSentenceLoss(loss, batch_predictions, batch_labels, batch_num_sentences):
             Gradient accumulation steps.
 """
 def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, device,
-          history_path, checkpoint, checkpoints_path, checkpoints_frequency, checkpoint_best, accumulation_steps=1):
+          history_path, checkpoint, checkpoints_path, checkpoints_frequency, checkpoint_best, accumulation_steps=1, use_mixed_precision=False):
     def _createCheckpoint(path, epoch_num, model, optimizer, metrics):
         torch.save({
             "epoch": epoch_num,
@@ -97,6 +97,7 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
     curr_best_val_recall = -1
     train_metrics = MetricsLogger()
     val_metrics = MetricsLogger()
+    scaler = torch.cuda.amp.GradScaler()
 
     if checkpoint is not None:
         print(f"-- Loading checkpoint at {checkpoint} --")
@@ -118,18 +119,30 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
         optimizer.zero_grad()
         for i, (documents, labels) in enumerate(tqdm(train_dataloader, desc=f"Epoch {epoch_num}/{epochs}")):
             labels = labels.float().to(device)
+            predictions = None
 
-            outputs = model(documents)
-            batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
-            acc_loss = batch_loss / accumulation_steps
-            acc_loss.backward()
+            if use_mixed_precision:
+                with torch.cuda.amp.autocast(dtype=torch.float16):
+                    predictions, logits = model(documents)
+                    batch_loss = perSentenceLoss(loss, logits, labels, documents["num_sentences"])
+                    acc_loss = batch_loss / accumulation_steps
+                scaler.scale(acc_loss).backward()
+            else:
+                predictions, logits = model(documents)
+                batch_loss = perSentenceLoss(loss, logits, labels, documents["num_sentences"])
+                acc_loss = batch_loss / accumulation_steps
+                acc_loss.backward()
 
             if ((i+1) % accumulation_steps == 0) or ((i+1) == len(train_dataloader)):
-                optimizer.step()
+                if use_mixed_precision:
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.step()
                 optimizer.zero_grad()
 
             train_metrics.add("loss", batch_loss.item())
-            train_metrics.add("recall", recall(labels, outputs))
+            train_metrics.add("recall", recall(labels, predictions))
 
         # Validation
         model.eval()
@@ -137,8 +150,8 @@ def train(model, loss, optimizer, train_dataloader, val_dataloader, epochs, devi
             for documents, labels in tqdm(val_dataloader, desc=f"Validation"):
                 labels = labels.float().to(device)
 
-                outputs = model(documents)
-                batch_loss = perSentenceLoss(loss, outputs, labels, documents["num_sentences"])
+                outputs, logits = model(documents)
+                batch_loss = perSentenceLoss(loss, logits, labels, documents["num_sentences"])
 
                 # Creates summaries for ROUGE
                 ext_summaries = []
@@ -190,6 +203,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoints-path", type=str, default="./__checkpoints__", help="Directory where the checkpoints will be stored")
     parser.add_argument("--history-path", type=str, default="./__checkpoints__/history.csv", help="CSV file where the training history will be stored")
     parser.add_argument("--checkpoints-freq", type=int, default=100, help="Number of epochs after which a checkpoint will be created")
+    parser.add_argument("--mixed-precision", action="store_true", default=False, help="Use mixed precision (FP32 + FP16)")
     args = parser.parse_args()
 
     torch.manual_seed(42)
@@ -203,7 +217,7 @@ if __name__ == "__main__":
     datasets = loadDataset(args.dataset, model.tokenizer, splits=["train", "validation"])
     train_dataloader = torch.utils.data.DataLoader(datasets["train"], batch_size=args.batch_size)
     val_dataloader = torch.utils.data.DataLoader(datasets["validation"], batch_size=args.batch_size)
-    loss = torch.nn.BCELoss()
+    loss = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
 
     if isinstance(model, LongformerSummarizer):
@@ -223,5 +237,6 @@ if __name__ == "__main__":
         checkpoint = args.checkpoint,
         checkpoints_path = args.checkpoints_path,
         checkpoints_frequency = args.checkpoints_freq,
-        checkpoint_best = args.checkpoint_best
+        checkpoint_best = args.checkpoint_best,
+        use_mixed_precision = args.mixed_precision
     )

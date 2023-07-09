@@ -59,6 +59,7 @@ class TransformerInterEncoder(nn.Module):
         x = self.positional_enc(x)
         x = self.encoders(x)
         x = self.layer_norm(x)
-        sentences_scores = self.sigmoid(self.linear(x))
+        logit = self.linear(x)
+        sentences_scores = self.sigmoid(logit)
 
-        return sentences_scores.squeeze(-1) 
+        return sentences_scores.squeeze(-1), logit.squeeze(-1)
