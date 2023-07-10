@@ -46,5 +46,5 @@ class RoBERTaSummarizer(BaseSummarizer):
 
         self.eval()
         with torch.no_grad():
-            predictions = self(batch)[0][:chunk_tokens.count(self.tokenizer.cls_token)]
-            return predictions
+            predictions, _ = self(batch)
+            return predictions[0][:chunk_tokens.count(self.tokenizer.cls_token)]
