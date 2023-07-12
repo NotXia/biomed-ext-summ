@@ -8,6 +8,7 @@ import random
 from metrics.rouge import evalROUGE
 from metrics.logger import MetricsLogger
 import sys
+from models.LongformerSummarizer import LongformerSummarizer
 
 
 """
@@ -71,8 +72,6 @@ if __name__ == "__main__":
     torch.manual_seed(42)
     random.seed(42)
     np.random.seed(42)
-    torch.use_deterministic_algorithms(mode=True)
-    if torch.cuda.is_available(): os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 
     datasets = load_from_disk(args.dataset)
     model = None
@@ -83,6 +82,10 @@ if __name__ == "__main__":
         checkpoint = torch.load(args.checkpoint, map_location=device)
         model = loadModel(checkpoint["model_name"]).to(device)
         model.load_state_dict(checkpoint["model_state_dict"])
+
+        if not isinstance(model, LongformerSummarizer):
+            torch.use_deterministic_algorithms(mode=True)
+            if torch.cuda.is_available(): os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 
         if args.strategy_length is not None:
             eval_args["strategy"] = "length"
