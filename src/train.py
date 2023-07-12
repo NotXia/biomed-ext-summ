@@ -204,11 +204,12 @@ if __name__ == "__main__":
     parser.add_argument("--history-path", type=str, default="./__checkpoints__/history.csv", help="CSV file where the training history will be stored")
     parser.add_argument("--checkpoints-freq", type=int, default=100, help="Number of epochs after which a checkpoint will be created")
     parser.add_argument("--mixed-precision", action="store_true", default=False, help="Use mixed precision (FP32 + FP16)")
+    parser.add_argument("--seed", type=int, default=42, help="Initialization seed")
     args = parser.parse_args()
 
-    torch.manual_seed(42)
-    random.seed(42)
-    np.random.seed(42)
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
     torch.use_deterministic_algorithms(mode=True)
     if torch.cuda.is_available(): os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 
