@@ -10,12 +10,12 @@ class LongformerDataset(torch.utils.data.Dataset):
 
         for data in tqdm(ext_dataset, desc="Loading dataset"):
             labels = [1 if label else 0 for label in data["labels"]]
-            ids = data["longformer_doc_ids"]
+            ids = data["doc_ids"]
             clss_mask = [False for _ in range(input_size)]
-            for i in data["longformer_cls_idxs"]: clss_mask[i] = True
-            attn_mask = [1 for _ in range(len(data["longformer_doc_ids"]))]
+            for i in data["cls_idxs"]: clss_mask[i] = True
+            attn_mask = [1 for _ in range(len(data["doc_ids"]))]
             global_attn_mask = [0 for _ in range(input_size)]
-            for i in data["longformer_cls_idxs"]: global_attn_mask[i] = 1
+            for i in data["cls_idxs"]: global_attn_mask[i] = 1
 
             self.labels.append( torch.tensor(padToSize(labels, input_size, 0)) ) 
             self.documents.append({

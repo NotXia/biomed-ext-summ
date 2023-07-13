@@ -57,10 +57,10 @@ def preprocessUtilitiesRoBERTa(tokenizer):
     def parseDataset(data):
         out = {}
         doc_ids, cls_idxs, labels = _parseForRoBERTa(data["sentences"], data["labels"], tokenizer)
-        out["__roberta_doc_ids"] = doc_ids
-        out["__roberta_cls_idxs"] = cls_idxs
+        out["__doc_ids"] = doc_ids
+        out["__cls_idxs"] = cls_idxs
         out["__labels"] = labels
-        assert len(out["__labels"]) == len(out["__roberta_cls_idxs"])
+        assert len(out["__labels"]) == len(out["__cls_idxs"])
         return out
 
     def filterDataset(dataset):
@@ -68,8 +68,8 @@ def preprocessUtilitiesRoBERTa(tokenizer):
             "id": dataset["id"],    
             "ref_summary": dataset["ref_summary"],    
             "labels": dataset["__labels"],
-            "roberta_doc_ids": dataset["__roberta_doc_ids"],
-            "roberta_cls_idxs": dataset["__roberta_cls_idxs"]
+            "doc_ids": dataset["__doc_ids"],
+            "cls_idxs": dataset["__cls_idxs"]
         }
         return Dataset.from_dict(dataset_content)
 

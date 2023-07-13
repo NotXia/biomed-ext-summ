@@ -18,9 +18,9 @@ class BERTSummarizer(BaseSummarizer):
         document_ids = batch["ids"].to(self.bert.device)
         segments_ids = batch["segments_ids"].to(self.bert.device)
         clss_mask = batch["clss_mask"].to(self.bert.device)
-        bert_mask = batch["bert_mask"].to(self.bert.device)
+        attn_mask = batch["attn_mask"].to(self.bert.device)
 
-        tokens_out, _ = self.bert(input_ids=document_ids, token_type_ids=segments_ids, attention_mask=bert_mask, return_dict=False)
+        tokens_out, _ = self.bert(input_ids=document_ids, token_type_ids=segments_ids, attention_mask=attn_mask, return_dict=False)
         out = []
         logits_out = []
 
@@ -39,14 +39,14 @@ class BERTSummarizer(BaseSummarizer):
         doc_ids = self.tokenizer.convert_tokens_to_ids(chunk_tokens)
         segment_ids = generateSegmentIds(doc_ids, self.tokenizer)
         clss_mask = [True if token == self.tokenizer.cls_token_id else False for token in doc_ids]
-        bert_mask = [1 for _ in range(len(doc_ids))]
+        attn_mask = [1 for _ in range(len(doc_ids))]
 
         # Simulates a batch of size 1
         batch = {}
         batch["ids"] = torch.as_tensor( [padToSize(doc_ids, 512, self.tokenizer.pad_token_id)] ).to(self.bert.device)
         batch["segments_ids"] = torch.as_tensor( [padToSize(segment_ids, 512, 0)] ).to(self.bert.device)
         batch["clss_mask"] = torch.as_tensor( [padToSize(clss_mask, 512, False)] ).to(self.bert.device)
-        batch["bert_mask"] = torch.as_tensor( [padToSize(bert_mask, 512, 0)] ).to(self.bert.device)
+        batch["attn_mask"] = torch.as_tensor( [padToSize(attn_mask, 512, 0)] ).to(self.bert.device)
 
         self.eval()
         with torch.no_grad():

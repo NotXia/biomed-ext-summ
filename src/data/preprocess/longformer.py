@@ -48,10 +48,10 @@ def preprocessUtilitiesLongformer(tokenizer):
     def parseDataset(data):
         out = {}
         doc_ids, cls_idxs, labels = _parseForLongformer(data["sentences"], data["labels"], tokenizer)
-        out["__longformer_doc_ids"] = doc_ids
-        out["__longformer_cls_idxs"] = cls_idxs
+        out["__doc_ids"] = doc_ids
+        out["__cls_idxs"] = cls_idxs
         out["__labels"] = labels
-        assert len(out["__labels"]) == len(out["__longformer_cls_idxs"])
+        assert len(out["__labels"]) == len(out["__cls_idxs"])
         return out
 
     def filterDataset(dataset):
@@ -59,8 +59,8 @@ def preprocessUtilitiesLongformer(tokenizer):
             "id": dataset["id"],    
             "ref_summary": dataset["ref_summary"],    
             "labels": dataset["__labels"],
-            "longformer_doc_ids": dataset["__longformer_doc_ids"],
-            "longformer_cls_idxs": dataset["__longformer_cls_idxs"]
+            "doc_ids": dataset["__doc_ids"],
+            "cls_idxs": dataset["__cls_idxs"]
         }
         return Dataset.from_dict(dataset_content)
 

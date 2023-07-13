@@ -9,9 +9,9 @@ class RoBERTaDataset(torch.utils.data.Dataset):
 
         for data in ext_dataset:
             labels = [1 if label else 0 for label in data["labels"]]
-            ids = data["roberta_doc_ids"]
-            clss_mask = [True if i in data["roberta_cls_idxs"] else False for i in range(input_size)]
-            attn_mask = [1 for _ in range(len(data["roberta_doc_ids"]))]
+            ids = data["doc_ids"]
+            clss_mask = [True if i in data["cls_idxs"] else False for i in range(input_size)]
+            attn_mask = [1 for _ in range(len(data["doc_ids"]))]
             
             self.labels.append( torch.tensor(padToSize(labels, input_size, 0)) ) 
             self.documents.append({

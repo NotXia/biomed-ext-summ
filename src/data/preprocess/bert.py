@@ -43,7 +43,7 @@ def _parseForBERT(sentences, labels, tokenizer, max_tokens=512):
 
     doc_ids = tokenizer.convert_tokens_to_ids(doc_tokens)
     segment_ids = generateSegmentIds(doc_ids, tokenizer)
-    cls_idxs = [i for i, token in enumerate(doc_ids) if token == tokenizer.vocab["[CLS]"]]
+    cls_idxs = [i for i, token in enumerate(doc_ids) if token == tokenizer.cls_token_id]
 
     return doc_ids, segment_ids, cls_idxs, reduced_labels
 
@@ -64,11 +64,11 @@ def preprocessUtilitiesBERT(tokenizer):
     def parseDataset(data):
         out = {}
         doc_ids, segments_ids, cls_idxs, labels = _parseForBERT(data["sentences"], data["labels"], tokenizer)
-        out["__bert_doc_ids"] = doc_ids
-        out["__bert_segments_ids"] = segments_ids
-        out["__bert_cls_idxs"] = cls_idxs
+        out["__doc_ids"] = doc_ids
+        out["__segments_ids"] = segments_ids
+        out["__cls_idxs"] = cls_idxs
         out["__labels"] = labels
-        assert len(out["__labels"]) == len(out["__bert_cls_idxs"])
+        assert len(out["__labels"]) == len(out["__cls_idxs"])
         return out
 
     def filterDataset(dataset):
@@ -76,9 +76,9 @@ def preprocessUtilitiesBERT(tokenizer):
             "id": dataset["id"],    
             "ref_summary": dataset["ref_summary"],    
             "labels": dataset["__labels"],
-            "bert_doc_ids": dataset["__bert_doc_ids"],
-            "bert_segments_ids": dataset["__bert_segments_ids"],
-            "bert_cls_idxs": dataset["__bert_cls_idxs"]
+            "doc_ids": dataset["__doc_ids"],
+            "segments_ids": dataset["__segments_ids"],
+            "cls_idxs": dataset["__cls_idxs"]
         }
         return Dataset.from_dict(dataset_content)
 
