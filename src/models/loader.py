@@ -1,7 +1,8 @@
-from transformers import AutoModel, AutoTokenizer, BertModel, RobertaModel, LongformerModel, MobileBertModel
+from transformers import AutoModel, AutoTokenizer, BertModel, RobertaModel, LongformerModel, MobileBertModel, DistilBertModel
 from models.BERTSummarizer import BERTSummarizer
 from models.RoBERTaSummarizer import RoBERTaSummarizer
 from models.LongformerSummarizer import LongformerSummarizer
+from models.DistilBERTSummarizer import DistilBERTSummarizer
 
 
 
@@ -29,5 +30,7 @@ def loadModel(model_name):
         return RoBERTaSummarizer(model, tokenizer)
     elif isinstance(model, LongformerModel):
         return LongformerSummarizer(model, tokenizer)
+    elif isinstance(model, DistilBertModel):
+        return DistilBERTSummarizer(model, tokenizer)
     else:
         raise NotImplementedError(f"{model_name} not available")

@@ -6,10 +6,12 @@ from datasets import load_from_disk
 from transformers import BertTokenizerFast, BertTokenizer, \
                         RobertaTokenizer, RobertaTokenizerFast, \
                         LongformerTokenizer, LongformerTokenizerFast, \
-                        MobileBertTokenizer, MobileBertTokenizerFast
+                        MobileBertTokenizer, MobileBertTokenizerFast, \
+                        DistilBertTokenizer, DistilBertTokenizerFast
 from data.BERTDataset import BERTDataset
 from data.RoBERTaDataset import RoBERTaDataset
 from data.LongformerDataset import LongformerDataset
+from data.DistilBERTDataset import DistilBERTDataset
 
 
 
@@ -46,6 +48,8 @@ def loadDataset(path, tokenizer, splits=[]):
         ModelDataset = RoBERTaDataset
     elif isinstance(tokenizer, LongformerTokenizer) or isinstance(tokenizer, LongformerTokenizerFast):
         ModelDataset = LongformerDataset
+    elif isinstance(tokenizer, DistilBertTokenizer) or isinstance(tokenizer, DistilBertTokenizerFast):
+        ModelDataset = DistilBERTDataset
     else:
         raise NotImplementedError(f"{tokenizer.name_or_path} not available")
 

@@ -5,14 +5,7 @@ Based on the paper: Text Summarization with Pretrained Encoders.
 import argparse
 import random
 from datasets import DatasetDict, load_from_disk
-from transformers import AutoTokenizer, \
-    BertTokenizer, BertTokenizerFast, \
-    RobertaTokenizer, RobertaTokenizerFast, \
-    LongformerTokenizer, LongformerTokenizerFast, \
-    MobileBertTokenizer, MobileBertTokenizerFast
-from data.preprocess.bert import preprocessUtilitiesBERT
-from data.preprocess.roberta import preprocessUtilitiesRoBERTa
-from data.preprocess.longformer import preprocessUtilitiesLongformer
+from data.preprocess.loader import loadPreprocessUtilities
 
 
 
@@ -27,20 +20,9 @@ if __name__ == "__main__":
     random.seed(42)
 
     dataset = load_from_disk(args.dataset_dir)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
     datasetMapFn, datasetFilterFn = None, None
     parsed_dataset = None
-
-    if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast) or \
-       isinstance(tokenizer, MobileBertTokenizer) or isinstance(tokenizer, MobileBertTokenizerFast):
-        datasetMapFn, datasetFilterFn = preprocessUtilitiesBERT(tokenizer)
-    elif isinstance(tokenizer, RobertaTokenizer) or isinstance(tokenizer, RobertaTokenizerFast):
-        datasetMapFn, datasetFilterFn = preprocessUtilitiesRoBERTa(tokenizer)
-    elif isinstance(tokenizer, LongformerTokenizer) or isinstance(tokenizer, LongformerTokenizerFast):
-        datasetMapFn, datasetFilterFn = preprocessUtilitiesLongformer(tokenizer)
-    else:
-        raise NotImplementedError
-
+    datasetMapFn, datasetFilterFn = loadPreprocessUtilities(args.model)
 
     dataset = dataset.map(datasetMapFn, num_proc=args.proc)
     parsed_dataset = {
