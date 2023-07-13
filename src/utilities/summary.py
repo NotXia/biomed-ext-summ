@@ -96,7 +96,6 @@ def splitDocument(doc_tokens, bos_token, eos_token, max_size):
             else:
                 doc_tokens = doc_tokens[:max_size-1] + [eos_token]
             eos_idx = max_size - 1
-            break
 
         chunks.append(doc_tokens[:eos_idx+1])
         doc_tokens = doc_tokens[eos_idx+1:]
