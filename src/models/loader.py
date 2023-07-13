@@ -1,4 +1,4 @@
-from transformers import AutoModel, AutoTokenizer, BertModel, RobertaModel, LongformerModel
+from transformers import AutoModel, AutoTokenizer, BertModel, RobertaModel, LongformerModel, MobileBertModel
 from models.BERTSummarizer import BERTSummarizer
 from models.RoBERTaSummarizer import RoBERTaSummarizer
 from models.LongformerSummarizer import LongformerSummarizer
@@ -23,7 +23,7 @@ def loadModel(model_name):
     model = AutoModel.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
 
-    if isinstance(model, BertModel):
+    if isinstance(model, BertModel) or isinstance(model, MobileBertModel):
         return BERTSummarizer(model, tokenizer)
     elif isinstance(model, RobertaModel):
         return RoBERTaSummarizer(model, tokenizer)

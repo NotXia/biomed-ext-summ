@@ -5,7 +5,8 @@ Dataset loading utilities
 from datasets import load_from_disk
 from transformers import BertTokenizerFast, BertTokenizer, \
                         RobertaTokenizer, RobertaTokenizerFast, \
-                        LongformerTokenizer, LongformerTokenizerFast
+                        LongformerTokenizer, LongformerTokenizerFast, \
+                        MobileBertTokenizer, MobileBertTokenizerFast
 from data.BERTDataset import BERTDataset
 from data.RoBERTaDataset import RoBERTaDataset
 from data.LongformerDataset import LongformerDataset
@@ -38,7 +39,8 @@ def loadDataset(path, tokenizer, splits=[]):
 
     ModelDataset = None
 
-    if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast):
+    if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast) or \
+       isinstance(tokenizer, MobileBertTokenizer) or isinstance(tokenizer, MobileBertTokenizerFast):
         ModelDataset = BERTDataset
     elif isinstance(tokenizer, RobertaTokenizer) or isinstance(tokenizer, RobertaTokenizerFast):
         ModelDataset = RoBERTaDataset

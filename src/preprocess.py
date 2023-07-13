@@ -8,7 +8,8 @@ from datasets import DatasetDict, load_from_disk
 from transformers import AutoTokenizer, \
     BertTokenizer, BertTokenizerFast, \
     RobertaTokenizer, RobertaTokenizerFast, \
-    LongformerTokenizer, LongformerTokenizerFast
+    LongformerTokenizer, LongformerTokenizerFast, \
+    MobileBertTokenizer, MobileBertTokenizerFast
 from data.preprocess.bert import preprocessUtilitiesBERT
 from data.preprocess.roberta import preprocessUtilitiesRoBERTa
 from data.preprocess.longformer import preprocessUtilitiesLongformer
@@ -30,7 +31,8 @@ if __name__ == "__main__":
     datasetMapFn, datasetFilterFn = None, None
     parsed_dataset = None
 
-    if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast):
+    if isinstance(tokenizer, BertTokenizer) or isinstance(tokenizer, BertTokenizerFast) or \
+       isinstance(tokenizer, MobileBertTokenizer) or isinstance(tokenizer, MobileBertTokenizerFast):
         datasetMapFn, datasetFilterFn = preprocessUtilitiesBERT(tokenizer)
     elif isinstance(tokenizer, RobertaTokenizer) or isinstance(tokenizer, RobertaTokenizerFast):
         datasetMapFn, datasetFilterFn = preprocessUtilitiesRoBERTa(tokenizer)
