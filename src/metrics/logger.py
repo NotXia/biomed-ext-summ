@@ -15,6 +15,7 @@ class MetricsLogger():
         self.total_rouge1 = { "fmeasure": [], "precision": [], "recall": [] }
         self.total_rouge2 = { "fmeasure": [], "precision": [], "recall": [] }
         self.total_rougeL = { "fmeasure": [], "precision": [], "recall": [] }
+        self.total_bertscore = { "fmeasure": [], "precision": [], "recall": [] }
 
 
     def add(self, type, value):
@@ -32,7 +33,10 @@ class MetricsLogger():
             self.total_rougeL["fmeasure"].append(value["rougeL"]["fmeasure"])
             self.total_rougeL["precision"].append(value["rougeL"]["precision"])
             self.total_rougeL["recall"].append(value["rougeL"]["recall"])
-
+        elif type == "bertscore":
+            self.total_bertscore["fmeasure"].append(value["fmeasure"])
+            self.total_bertscore["precision"].append(value["precision"])
+            self.total_bertscore["recall"].append(value["recall"])
 
     def averages(self):
         return {
@@ -52,7 +56,12 @@ class MetricsLogger():
                 "recall": np.average(self.total_rougeL["recall"]),
                 "precision": np.average(self.total_rougeL["precision"]),
                 "fmeasure": np.average(self.total_rougeL["fmeasure"])
-            }
+            },
+            "bertscore": {
+                "recall": np.average(self.total_bertscore["recall"]),
+                "precision": np.average(self.total_bertscore["precision"]),
+                "fmeasure": np.average(self.total_bertscore["fmeasure"])
+            },
         }
 
 
@@ -65,8 +74,10 @@ class MetricsLogger():
         if "recall" in types:
             out += f"Recall {avgs['recall']:.5f} | "
         if "rouge" in types:
-            out += f"ROUGE-1 r: {avgs['rouge1']['recall']*100:.2f} -- p: {avgs['rouge1']['precision']*100:.2f} -- f1: {avgs['rouge1']['fmeasure']*100:.2f} | "
-            out += f"ROUGE-2 r: {avgs['rouge2']['recall']*100:.2f} -- p: {avgs['rouge2']['precision']*100:.2f} -- f1: {avgs['rouge2']['fmeasure']*100:.2f} | "
-            out += f"ROUGE-L r: {avgs['rougeL']['recall']*100:.2f} -- p: {avgs['rougeL']['precision']*100:.2f} -- f1: {avgs['rougeL']['fmeasure']*100:.2f} | "
+            out += f"R-1 r: {avgs['rouge1']['recall']*100:.2f} -- p: {avgs['rouge1']['precision']*100:.2f} -- f1: {avgs['rouge1']['fmeasure']*100:.2f} | "
+            out += f"R-2 r: {avgs['rouge2']['recall']*100:.2f} -- p: {avgs['rouge2']['precision']*100:.2f} -- f1: {avgs['rouge2']['fmeasure']*100:.2f} | "
+            out += f"R-L r: {avgs['rougeL']['recall']*100:.2f} -- p: {avgs['rougeL']['precision']*100:.2f} -- f1: {avgs['rougeL']['fmeasure']*100:.2f} | "
+        if "bertscore" in types:
+            out += f"BS r: {avgs['bertscore']['recall']*100:.2f} -- p: {avgs['bertscore']['precision']*100:.2f} -- f1: {avgs['bertscore']['fmeasure']*100:.2f} | "
 
         return out

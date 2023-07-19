@@ -6,9 +6,9 @@ import argparse
 import os
 import random
 from metrics.rouge import evalROUGE
+from metrics.bertscore import evalBERTScore
 from metrics.logger import MetricsLogger
 import sys
-from models.LongformerSummarizer import LongformerSummarizer
 
 
 """
@@ -46,11 +46,12 @@ def evaluate(model, datasets, splits, args={}):
                     summary = "\n".join(selected_sents)
 
             metrics.add("rouge", evalROUGE( [document["ref_summary"]], [summary] ))
-            sys.stdout.write(f"\r{i+1}/{len(datasets[split])} ({split}) --- {metrics.format(['rouge'])}\033[K")
+            metrics.add("bertscore", evalBERTScore( [document["ref_summary"]], [summary] ))
+            sys.stdout.write(f"\r{i+1}/{len(datasets[split])} ({split}) --- {metrics.format(['rouge', 'bertscore'])}\033[K")
             sys.stdout.flush()
 
     sys.stdout.write("\r\033[K")
-    print(f"{metrics.format(['rouge'])}")
+    print(f"{metrics.format(['rouge', 'bertscore'])}")
 
 
 
@@ -82,10 +83,6 @@ if __name__ == "__main__":
         checkpoint = torch.load(args.checkpoint, map_location=device)
         model = loadModel(checkpoint["model_name"]).to(device)
         model.load_state_dict(checkpoint["model_state_dict"])
-
-        if not isinstance(model, LongformerSummarizer):
-            torch.use_deterministic_algorithms(mode=True)
-            if torch.cuda.is_available(): os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 
         if args.strategy_length is not None:
             eval_args["strategy"] = "length"
