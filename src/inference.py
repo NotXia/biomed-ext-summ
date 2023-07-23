@@ -40,7 +40,8 @@ if __name__ == "__main__":
 
     summary = "\n".join(summary_sents)
     print()
-    print(summary)
-    print()
+    print(">> Document >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     print(document)
-
+    print()
+    print(">> Summary >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    print(summary)
