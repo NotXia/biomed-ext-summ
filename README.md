@@ -3,6 +3,13 @@
 An evaluation of general-domain and biomedical pretrained language models for biomedical extractive summarization.
 
 
+## Available weights
+Fine tuned weights for the following models are available on Hugging Face:
+| Model | Hugging Face |
+|-------|--------------|
+| Longformer | [NotXia/longformer-bio-ext-summ](https://huggingface.co/NotXia/longformer-bio-ext-summ) |
+| PubMedBERT | [NotXia/pubmedbert-bio-ext-summ](https://huggingface.co/NotXia/pubmedbert-bio-ext-summ) |
+
 ## Installation
 Move into `src` and run:
 ```
