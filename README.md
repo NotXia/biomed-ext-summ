@@ -1,5 +1,7 @@
 # Biomedical extractive summarization
 
+Work done for my [Bachelor's thesis](https://amslaurea.unibo.it/id/eprint/29686).
+
 An evaluation of general-domain and biomedical pretrained language models for biomedical extractive summarization.
 
 
