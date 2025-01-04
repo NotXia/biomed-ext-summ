@@ -3,10 +3,14 @@ from transformers import AutoTokenizer, \
     RobertaTokenizer, RobertaTokenizerFast, \
     LongformerTokenizer, LongformerTokenizerFast, \
     MobileBertTokenizer, MobileBertTokenizerFast, \
-    DistilBertTokenizer, DistilBertTokenizerFast
+    DistilBertTokenizer, DistilBertTokenizerFast, \
+    BartTokenizer, BartTokenizerFast, \
+    T5Tokenizer, T5TokenizerFast
 from data.preprocess.bert import preprocessUtilitiesBERT
 from data.preprocess.roberta import preprocessUtilitiesRoBERTa
 from data.preprocess.longformer import preprocessUtilitiesLongformer
+from data.preprocess.bart import preprocessUtilitiesBART
+from data.preprocess.t5 import preprocessUtilitiesT5
 
 
 
@@ -38,5 +42,9 @@ def loadPreprocessUtilities(model_name):
         return preprocessUtilitiesRoBERTa(tokenizer)
     elif isinstance(tokenizer, LongformerTokenizer) or isinstance(tokenizer, LongformerTokenizerFast):
         return preprocessUtilitiesLongformer(tokenizer)
+    elif isinstance(tokenizer, BartTokenizer) or isinstance(tokenizer, BartTokenizerFast):
+        return preprocessUtilitiesBART(tokenizer)
+    elif isinstance(tokenizer, T5Tokenizer) or isinstance(tokenizer, T5TokenizerFast):
+        return preprocessUtilitiesT5(tokenizer)
     else:
         raise NotImplementedError

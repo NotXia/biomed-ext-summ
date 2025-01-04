@@ -7,11 +7,15 @@ from transformers import BertTokenizerFast, BertTokenizer, \
                         RobertaTokenizer, RobertaTokenizerFast, \
                         LongformerTokenizer, LongformerTokenizerFast, \
                         MobileBertTokenizer, MobileBertTokenizerFast, \
-                        DistilBertTokenizer, DistilBertTokenizerFast
+                        DistilBertTokenizer, DistilBertTokenizerFast, \
+                        BartTokenizer, BartTokenizerFast, \
+                        T5Tokenizer, T5TokenizerFast
 from data.BERTDataset import BERTDataset
 from data.RoBERTaDataset import RoBERTaDataset
 from data.LongformerDataset import LongformerDataset
 from data.DistilBERTDataset import DistilBERTDataset
+from data.BARTDataset import BARTDataset
+from data.T5Dataset import T5Dataset
 
 
 
@@ -50,6 +54,10 @@ def loadDataset(path, tokenizer, splits=[]):
         ModelDataset = LongformerDataset
     elif isinstance(tokenizer, DistilBertTokenizer) or isinstance(tokenizer, DistilBertTokenizerFast):
         ModelDataset = DistilBERTDataset
+    elif isinstance(tokenizer, BartTokenizer) or isinstance(tokenizer, BartTokenizerFast):
+        ModelDataset = BARTDataset
+    elif isinstance(tokenizer, T5Tokenizer) or isinstance(tokenizer, T5TokenizerFast):
+        ModelDataset = T5Dataset
     else:
         raise NotImplementedError(f"{tokenizer.name_or_path} not available")
 

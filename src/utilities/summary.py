@@ -42,7 +42,7 @@ def select(sentences, predictions, strategy, strategy_args):
         selected_sents = _selectStrategyThreshold(sentences, predictions, strategy_args)
     else:
         raise NotImplementedError(f"Unknown strategy {strategy}")
-    
+
     return [sentences[i] for i in selected_sents], selected_sents
 
 
@@ -71,23 +71,27 @@ def select(sentences, predictions, strategy, strategy_args):
 def splitDocument(doc_tokens, bos_token, eos_token, max_size):
     def _findNextBOSFrom(start_idx):
         for i in range(start_idx, len(doc_tokens)):
-            if doc_tokens[i] == bos_token:
-                return i
+            if bos_token is not None:
+                if doc_tokens[i] == bos_token:
+                    return i
+            else:
+                if doc_tokens[i] == eos_token:
+                    return i+1
         return -1
-    
+
     def _findPreviousEOSFrom(start_idx):
         for i in range(start_idx, -1, -1):
             if doc_tokens[i] == eos_token:
                 return i
         return -1
-    
+
     chunks = []
-    
+
     while len(doc_tokens) > max_size:
         # Splits at the eos token
         eos_idx = _findPreviousEOSFrom(max_size - 1)
 
-        if eos_idx == -1: 
+        if eos_idx == -1:
             # The sentence is too long.
             # Find the next bos in front of the current sentence (if exists) and truncate the current sentence.
             next_bos_idx = _findNextBOSFrom(max_size)
@@ -101,5 +105,5 @@ def splitDocument(doc_tokens, bos_token, eos_token, max_size):
         doc_tokens = doc_tokens[eos_idx+1:]
 
     if len(doc_tokens) > 0: chunks.append(doc_tokens) # Remaining part of the document
-    
+
     return chunks
