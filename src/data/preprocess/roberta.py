@@ -15,7 +15,7 @@ import itertools
     ----------
         sentences : str[]
         labels : bool[]
-        tokenizer : BertTokenizer
+        tokenizer : RobertaTokenizer
         max_tokens : int
 
     Returns

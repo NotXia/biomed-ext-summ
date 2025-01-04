@@ -14,7 +14,7 @@ from data.preprocess.roberta import _parseForRoBERTa
     ----------
         sentences : str[]
         labels : bool[]
-        tokenizer : BertTokenizer
+        tokenizer : LongformerTokenizer
         max_tokens : int
 
     Returns
@@ -34,7 +34,7 @@ def _parseForLongformer(sentences, labels, tokenizer, max_tokens=4096):
 
 
 """
-    Return the utilities to parse BERT
+    Return the utilities to parse Longformer
 
     Returns
     -------
